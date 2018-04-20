@@ -3,5 +3,9 @@
         "iostream": "cpp"
     },
     "editor.tabSize": 4,
-    "editor.insertSpaces": true
+    "editor.insertSpaces": true,
+    "editor.formatOnPaste": false,
+    "editor.formatOnSave": true,
+    "git.enabled": true,
+    "C_Cpp.intelliSenseEngine": "Default"
 }
