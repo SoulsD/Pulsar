@@ -1,6 +1,43 @@
 {
     "configurations": [
         {
+            "name": "Msys64",
+            "includePath": [
+                "${workspaceFolder}/include",
+                "C:/msys64/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/7.3.0/../../../../include/c++/7.3.0",
+                "C:/msys64/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/7.3.0/../../../../include/c++/7.3.0/x86_64-w64-mingw32",
+                "C:/msys64/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/7.3.0/../../../../include/c++/7.3.0/backward",
+                "C:/msys64/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/7.3.0/include",
+                "C:/msys64/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/7.3.0/../../../../include",
+                "C:/msys64/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/7.3.0/include-fixed",
+                "C:/msys64/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/7.3.0/../../../../x86_64-w64-mingw32/include"
+            ],
+            "defines": [
+                "_DEBUG",
+                "UNICODE",
+                "_UNICODE",
+                "__GNUC__=7",
+                "__cdecl=__attribute__((__cdecl__))"
+            ],
+            "intelliSenseMode": "clang-x64",
+            "browse": {
+                "path": [
+                    "${workspaceFolder}",
+                    "C:/msys64/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/7.3.0/../../../../include/c++/7.3.0",
+                    "C:/msys64/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/7.3.0/../../../../include/c++/7.3.0/x86_64-w64-mingw32",
+                    "C:/msys64/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/7.3.0/../../../../include/c++/7.3.0/backward",
+                    "C:/msys64/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/7.3.0/include",
+                    "C:/msys64/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/7.3.0/../../../../include",
+                    "C:/msys64/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/7.3.0/include-fixed",
+                    "C:/msys64/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/7.3.0/../../../../x86_64-w64-mingw32/include"
+                ],
+                "limitSymbolsToIncludedHeaders": true,
+                "databaseFilename": ""
+            },
+            "cStandard": "c11",
+            "cppStandard": "c++11"
+        },
+        {
             "name": "Mac",
             "includePath": [
                 "/usr/include",
@@ -41,32 +78,6 @@
                 "limitSymbolsToIncludedHeaders": true,
                 "databaseFilename": ""
             }
-        },
-        {
-            "name": "Msys64",
-            "includePath": [
-                "C:/msys64/mingw64/include",
-                "C:/msys64/mingw64/include/c++/7.3.0",
-                "C:/msys64/mingw64/include/c++/7.3.0/x86_64-w64-mingw32",
-                "C:/msys64/mingw64/x86_64-w64-mingw32/include",
-                "${workspaceFolder}"
-            ],
-            "defines": [
-                "_DEBUG",
-                "UNICODE",
-                "_UNICODE"
-            ],
-            "intelliSenseMode": "clang-x64",
-            "browse": {
-                "path": [
-                    "${workspaceFolder}",
-                    "C:/msys64/mingw64"
-                ],
-                "limitSymbolsToIncludedHeaders": true,
-                "databaseFilename": ""
-            },
-            "cStandard": "c11",
-            "cppStandard": "c++17"
         }
     ],
     "version": 3
