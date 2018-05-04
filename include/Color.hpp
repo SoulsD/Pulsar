@@ -14,31 +14,20 @@
  * https://en.wikipedia.org/wiki/Alpha_compositing
  * https://en.wikipedia.org/wiki/Blend_modes
 
- *  Color operator + += Color -> Color::blend
- *      -> operator + (Color const&)
- *  static setBlendMode(Color& Color::*(Color, Color))
-
  *  Color operator * / float, and with = operator
 
  *  getter argb / rgba ... | uint8, uint16, ...
-
+ *      => "#AARRGGBB", "#RRGGBBAA"
  *  Add Color Models (HSV, HSL)
  *  https://en.wikipedia.org/wiki/Color_model
 
  *  ColorComponent:
  *      Add option / set flag to desactivate overflow check on + , - and *
 
- *  Color Comparision
-     bool Color::operator<(const Color& c) const
-     {
-         return (value() < c.value());
-     }
-
- *  User-defined literals ->     "#F046CA"_rgb;
+ *  User-defined literals ->     "#RRGGBBAA"_rgba;
  *   Color operator""_rgb(const char*, std::size_t) {
          return Color();
      }
-
 
  *  Substract Color ??
  *  https://en.wikipedia.org/wiki/Subtractive_color
