@@ -11,7 +11,7 @@ PULSAR_OBJS	= $(PULSAR_SRC:.cpp=.o)
 
 OBJS		= $(PULSAR_OBJS)
 
-TEST_SRC	= $(TESTDIR)/headers/ColorUnittest.cpp
+TEST_SRC	= $(TESTDIR)headers/ColorUnittest.cpp
 TEST_OBJS	= $(TEST_SRC:.cpp=.o)
 
 PULSAR_INC	= -I $(INCDIR)

@@ -5,7 +5,7 @@
 #include <cstdint>
 #include <sstream>
 
-#define COLOR_COMPONENT_OVERFLOW_CHECK
+#include "Constants.hh"
 
 /*  TODO:
 
@@ -20,6 +20,7 @@
 
  *  Color operator * / float, and with = operator
 
+ *  getter argb / rgba ... | uint8, uint16, ...
 
  *  Add Color Models (HSV, HSL)
  *  https://en.wikipedia.org/wiki/Color_model
@@ -30,8 +31,14 @@
  *  Color Comparision
      bool Color::operator<(const Color& c) const
      {
-           return (value() < c.value());
+         return (value() < c.value());
      }
+
+ *  User-defined literals ->     "#F046CA"_rgb;
+ *   Color operator""_rgb(const char*, std::size_t) {
+         return Color();
+     }
+
 
  *  Substract Color ??
  *  https://en.wikipedia.org/wiki/Subtractive_color
@@ -46,6 +53,7 @@ private:
     static constexpr auto GREEN = 1;
     static constexpr auto BLUE  = 0;
 
+
     /**
      *  Sub Classes :
      *      union uColor
@@ -54,7 +62,7 @@ private:
 
 private:
     /**
-     *  union uColor
+     *  Union uColor
      */
 
     union uColor final {
@@ -72,18 +80,22 @@ private:
             return *this;
         }
 
-        uColor(uint32_t c) { this->hex = c; }
+        uColor& operator=(uColor&&) = default;
 
-        uColor(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255) {
+        uColor(uint32_t c) {  // /!\ 0xAARRGGBB
+            this->hex = c;
+        }
+
+        uColor(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
             this->component[RED]   = r;
             this->component[GREEN] = g;
             this->component[BLUE]  = b;
             this->component[ALPHA] = a;
         }
-    };
+    }; /* !uColor */
 
     /**
-     *  class ColorComponent
+     *  Class ColorComponent
      */
 
     class ColorComponent final {
@@ -99,43 +111,47 @@ private:
         operator uint8_t() const { return *(this->_component); }
 
         ColorComponent& operator=(uint32_t value) {
-            *(this->_component) = value > 0xFF ? 0xFF : value;
+            *(this->_component) = std::min(value, 0xFFu);
             return *this;
         }
 
         ColorComponent& operator+=(uint8_t value) {
             uint32_t res = *(this->_component) + value;
 
-            *(this->_component) = res > 0xFF ? 0xFF : res;
+            *(this->_component) = std::min(res, 0xFFu);
             return *this;
         }
 
         ColorComponent& operator-=(uint8_t value) {
-            uint32_t res = *(this->_component) - value;
+            uint8_t res = *(this->_component) - value;
 
-            *(this->_component) = res > 0xFF ? 0x0 : res;
+            *(this->_component) = value >= *(this->_component) ? 0x0 : res;
             return *this;
         }
 
         ColorComponent& operator*=(double value) {
-            if (value >= 0) {
-                uint32_t res = *(this->_component) * value;
+            if (value > 0) {
+                uint32_t res = std::round(*(this->_component) * value);
 
-                *(this->_component) = res > 0xFF ? 0xFF : res;
+                *(this->_component) = std::min(res, 0xFFu);
             } else {
-                // FIXME
                 *(this->_component) = 0;
             }
             return *this;
         }
 
         ColorComponent& operator/=(double value) {
-            if (value >= 0) {
-                uint32_t res = *(this->_component) / value;
+            uint32_t res;
 
-                *(this->_component) = res > 0xFF ? 0xFF : res;
+            if (value >= 1) {
+                res = std::round(*(this->_component) / value);
+
+                *(this->_component) = std::max(res, 0x00u);
+            } else if (value > 0) {
+                res = std::round(*(this->_component) / value);
+
+                *(this->_component) = std::min(res, 0xFFu);
             } else {
-                // FIXME
                 *(this->_component) = 0;
             }
             return *this;
@@ -186,8 +202,9 @@ public:
     ColorComponent b = &(this->_color.component[BLUE]);
     ColorComponent a = &(this->_color.component[ALPHA]);
 
+
     /**
-     *  C++ Constructor & Cast operator
+     *  C++ Constructor
      */
 
 public:
@@ -200,20 +217,40 @@ public:
         return *this;
     }
 
-    Color(uint32_t c) : _color(c) {}
+    Color& operator=(Color&&) = default;
+
+    Color(uint32_t c) : _color(c) {
+#ifdef COLOR_IMPLICIT_ALPHA_ASSIGNMENT
+        if (this->a == 0) {
+            this->a = 255;
+        }
+#endif /* !COLOR_IMPLICIT_ALPHA_ASSIGNMENT */
+    }
 
     Color(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255)
         : _color(r, g, b, a) {}
 
-    operator uint32_t() const { return this->_color.hex; }
 
     /**
      *  Color Constructors
      */
 
 public:
-    inline static Color rgba(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
-        return Color(r, g, b, a);
+    inline static Color rgb(uint8_t r, uint8_t g, uint8_t b) {
+        return Color(r, g, b);
+    }
+
+    inline static Color rgba(uint8_t r, uint8_t g, uint8_t b, double a = .0) {
+        uint8_t alpha = std::min(
+            std::max(static_cast<int>(std::round(0xFF * a)), 0x00), 0xFF);
+        return Color(r, g, b, alpha);
+    }
+
+    // 0xRRGGBB
+    inline static Color rgb(uint32_t c) {
+        // force Alpha to FF
+        c = (c & ~0xFF000000) | 0xFF000000;
+        return Color(c);
     }
 
     // 0xAARRGGBB
@@ -222,7 +259,7 @@ public:
     // 0xRRGGBBAA
     static Color rgba(uint32_t c) {
         // (0xRRGGBBAA -> 0xAARRGGBB)
-        c = (c & 0x00FFFFFF) << 8 | (c & 0xFF000000) >> 24;
+        c = (c & 0xFFFFFF00) >> 8 | (c & 0x000000FF) << 24;
         return Color(c);
     }
 
@@ -243,6 +280,66 @@ public:
         return Color(c);
     }
 
+
+    /**
+     *  Color Assignment overload
+     */
+
+    operator uint32_t() const { return this->_color.hex; }
+
+    Color& operator=(uint32_t const& c) {
+        this->_color = c;
+#ifdef COLOR_IMPLICIT_ALPHA_ASSIGNMENT
+        if (this->a == 0) {
+            this->a = 255;
+        }
+#endif /* !COLOR_IMPLICIT_ALPHA_ASSIGNMENT */
+        return *this;
+    }
+
+
+    /**
+     *  Relational Operators
+     *      Implicit comparison with integers disabled
+     */
+
+    inline bool operator==(Color const& c) const {
+#ifdef COLOR_INCLUDE_ALPHA_IN_COMPARISON
+        return this->_color.hex == c._color.hex;
+#else
+        return this->_color.component[RED] == c._color.component[RED]
+               && this->_color.component[GREEN] == c._color.component[GREEN]
+               && this->_color.component[BLUE] == c._color.component[BLUE];
+#endif /* !COLOR_INCLUDE_ALPHA_IN_COMPARISON */
+    }
+    inline bool operator!=(Color const& c) const { return !(*this == c); }
+
+    inline bool operator<(Color const& c) const {
+        return this->value() < c.value();
+    }
+    inline bool operator>(Color const& c) const { return c < *this; }
+    inline bool operator<=(Color const& c) const { return !(*this > c); }
+    inline bool operator>=(Color const& c) const { return !(*this < c); }
+
+    /**
+     *  Explicitly Deleted Operators
+     */
+
+    Color& operator++()         = delete;
+    Color  operator++(int)      = delete;
+    Color& operator--()         = delete;
+    Color  operator--(int)      = delete;
+    Color  operator+(int) const = delete;
+    Color  operator-(int) const = delete;
+    Color  operator*(int) const = delete;
+    Color  operator/(int) const = delete;
+    Color  operator%(int) const = delete;
+    Color  operator+=(int)      = delete;
+    Color  operator-=(int)      = delete;
+    Color  operator*=(int)      = delete;
+    Color  operator/=(int)      = delete;
+    Color  operator%=(int)      = delete;
+
     /**
      *  Color Blend
      *      src: https://wiki.libsdl.org/SDL_SetTextureBlendMode
@@ -252,7 +349,11 @@ public:
     class Blend final {
     private:
         inline static uint32_t overflowCheck(uint32_t v) {
-            return v > 255 ? 255 : v;
+#ifdef COLOR_COMPONENT_OVERFLOW_CHECK
+            return std::min(v, 0xFFu);
+#else
+            return v;
+#endif
         }
 
     public:
@@ -294,22 +395,34 @@ public:
         Color::_blendMode = mode;
     }
 
-    Color operator+(Color const& c) { return Color::_blendMode(*this, c); }
+    // Color operator+(Color const& c) { return Color::_blendMode(*this, c); }
+
+    Color& operator+=(Color const& c) {
+        return (*this = Color::_blendMode(*this, c));
+    }
+
+    // friends defined inside class body are inline and are hidden from non-ADL
+    // lookup
+    friend Color operator+(Color lhs, Color const& rhs) {
+        lhs += rhs;  // reuse compound assignment
+        return lhs;  // return the result by value (uses move constructor)
+    }
 
 private:
     static Color (*_blendMode)(Color const&, Color const&);
+
 
     /**
      *  Class Utils
      */
 
 public:
-    inline float alpha() const { return this->a / 255.f; }
+    inline double alpha() const { return this->a / 255.; }
 
     inline double dist(Color const& c) const {
-        return std::sqrt(static_cast<float>(std::pow(c.r - this->r, 2)
-                                            + std::pow(c.g - this->g, 2)
-                                            + std::pow(c.b - this->b, 2)));
+        return std::sqrt(static_cast<double>(std::pow(c.r - this->r, 2)
+                                             + std::pow(c.g - this->g, 2)
+                                             + std::pow(c.b - this->b, 2)));
     }
 
     // ITU-R (International Telecommunication Union recomm.) formula
@@ -324,17 +437,44 @@ public:
             << " b: " << (int) this->b << " a: " << (int) this->a << ")";
         return oss.str();
     }
-};
+}; /* !Color */
 
-#ifndef NO_C_STYLE_COLOR_CONSTRUCTION
-inline static Color rgba(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
+
+/**
+ *  Disable implicit comparison with integers
+ */
+
+inline bool operator==(Color const&, uint32_t const&) = delete;
+inline bool operator==(uint32_t const&, Color const&) = delete;
+inline bool operator!=(Color const&, uint32_t const&) = delete;
+inline bool operator!=(uint32_t const&, Color const&) = delete;
+
+inline bool operator<(Color const&, uint32_t const&)  = delete;
+inline bool operator<(uint32_t const&, Color const&)  = delete;
+inline bool operator>(Color const&, uint32_t const&)  = delete;
+inline bool operator>(uint32_t const&, Color const&)  = delete;
+inline bool operator<=(Color const&, uint32_t const&) = delete;
+inline bool operator<=(uint32_t const&, Color const&) = delete;
+inline bool operator>=(Color const&, uint32_t const&) = delete;
+inline bool operator>=(uint32_t const&, Color const&) = delete;
+
+/**
+ *  C style Color construction
+ */
+
+#ifndef COLOR_NO_C_STYLE_CONSTRUCTION
+inline static Color rgba(uint8_t r, uint8_t g, uint8_t b, double a = .0) {
     return Color::rgba(r, g, b, a);
 }
 
 inline static Color rgb(uint8_t r, uint8_t g, uint8_t b) {
-    return rgba(r, g, b, 255);
+    return Color::rgb(r, g, b);
 }
-#endif /* !NO_C_STYLE_COLOR_CONSTRUCTION */
+#endif /* !COLOR_NO_C_STYLE_CONSTRUCTION */
+
+/**
+ *  Blend mode default value
+ */
 
 Color (*Color::_blendMode)(Color const&, Color const&) = &Color::Blend::none;
 

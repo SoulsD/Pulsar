@@ -1,13 +1,11 @@
 {
     "files.associations": {
         ".clang-format": "yaml",
-        "iostream": "cpp",
-        "sstream": "cpp"
     },
     "editor.tabSize": 4,
     "editor.insertSpaces": true,
     "editor.formatOnPaste": false,
-    "editor.formatOnSave": false,
+    "editor.formatOnSave": true,
     "C_Cpp.intelliSenseEngine": "Default",
     "C_Cpp.clang_format_path": "C:/msys64/mingw64/bin/clang-format.exe",
     "terminal.integrated.shell.windows": "C:/msys64/usr/bin/bash.exe",
