@@ -16,12 +16,16 @@ TEST_OBJS	= $(TEST_SRC:.cpp=.o)
 
 PULSAR_INC	= -I $(INCDIR)
 
+DBGFLAGS	+= -g -ggdb
+
 CXXFLAGS	+= -std=c++17
 CXXFLAGS	+= -Wall
 CXXFLAGS	+= -Wextra
+CXXFLAGS	+= $(DBGFLAGS)
 CXXFLAGS	+= $(PULSAR_INC)
 
 LDFLAGS		+= -lvulkan
+LDFLAGS		+= -lglfw3
 
 CXX			= g++
 ECHO		= echo
@@ -54,8 +58,9 @@ fclean: clean
 
 re: fclean all
 
-dbg: CXXFLAGS += -g
-dbg: re
+release: CXXFLAGS -= $(DBGFLAGS)
+release: CXXFLAGS += -DNDEBUG
+release: $(NAME)
 
 .cpp.o:
 	@echo $(CXX) -c $(CXXFLAGS) $<

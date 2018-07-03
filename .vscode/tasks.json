@@ -13,7 +13,8 @@
             "group": {
                 "kind": "build",
                 "isDefault": true
-            }
+            },
+            "problemMatcher": "$gcc"
         },
         {
             "label": "build test",
@@ -23,6 +24,17 @@
                 "command": "mingw32-make test"
             },
             "group": "build",
+            "problemMatcher": "$gcc"
+        },
+        {
+            "label": "build release",
+            "type": "shell",
+            "command": "make release",
+            "windows": {
+                "command": "mingw32-make release"
+            },
+            "group": "build",
+            "problemMatcher": "$gcc"
         },
         {
             "label": "clean",
@@ -31,15 +43,36 @@
             "windows": {
                 "command": "mingw32-make clean"
             },
-            "group": "build"
+            "group": "build",
         },
         {
             "label": "run tests",
             "type": "shell",
-            "command": "./build/run_unittest",
+            "command": "test/run_unittest",
             "group": {
                 "kind": "test",
                 "isDefault": true
+            },
+            "problemMatcher": {
+                "fileLocation": [
+                    "relative",
+                    "${workspaceFolder}"
+                ],
+                "owner": "gtest",
+                "severity": "error",
+                // gtest multiline error handling
+                "pattern": [
+                    {
+                        "regexp": "^(.*):(\\d+):\\s+.*$",
+                        "file": 1,
+                        "line": 2
+                    },
+                    {
+                        "regexp": "^((:?Value of:.*)|(:?  Actual: .*)|(:?Expected: .*)|(:?      Expected: .*)|(:?To be equal to: .*)|(:?      Which is: .*))$",
+                        "message": 1,
+                        "loop": true
+                    }
+                ]
             }
         }
     ]

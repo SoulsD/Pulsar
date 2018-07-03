@@ -9,10 +9,17 @@
 
 /*  TODO:
 
- * http://viz.aset.psu.edu/gho/sem_notes/color_2d/html/primary_systems.html
- * http://lesscss.org/functions/#color-definition
- * https://en.wikipedia.org/wiki/Alpha_compositing
- * https://en.wikipedia.org/wiki/Blend_modes
+ *  http://viz.aset.psu.edu/gho/sem_notes/color_2d/html/primary_systems.html
+ *  http://lesscss.org/functions/#color-definition
+ *  https://en.wikipedia.org/wiki/Alpha_compositing
+
+ *  https://en.wikipedia.org/wiki/Blend_modes
+
+ *  https://en.wikipedia.org/wiki/CIELAB_color_space#CIELAB
+
+ *  https://github.com/halostatue/color
+
+ *  Blend default via #define
 
  *  Color operator * / float, and with = operator
 
@@ -33,6 +40,9 @@
  *  https://en.wikipedia.org/wiki/Subtractive_color
 
  */
+
+using std::uint32_t;
+using std::uint8_t;
 
 class Color final {
 private:
@@ -290,6 +300,10 @@ public:
     /**
      *  Relational Operators
      *      Implicit comparison with integers disabled
+     *
+     *  TODO:
+     *      https://stackoverflow.com/a/9019461
+     *      https://en.wikipedia.org/wiki/Color_difference
      */
 
     inline bool operator==(Color const& c) const {
@@ -335,9 +349,12 @@ public:
      */
 
 public:
+    typedef Color (*BlendMode_t)(Color const&, Color const&);
+
     class Blend final {
     private:
         inline static uint32_t overflowCheck(uint32_t v) {
+        // v1, v2 cast from uint8_t to uint32_t
 #ifdef COLOR_COMPONENT_OVERFLOW_CHECK
             return std::min(v, 0xFFu);
 #else
@@ -380,11 +397,11 @@ public:
     }; /* !Blend */
 
 public:
-    inline static void setBlendMode(Color (*mode)(Color const&, Color const&)) {
+    inline static void setBlendMode(BlendMode_t mode) {
         Color::_blendMode = mode;
     }
 
-    // Color operator+(Color const& c) { return Color::_blendMode(*this, c); }
+    inline static BlendMode_t getBlendMode() { return Color::_blendMode; }
 
     Color& operator+=(Color const& c) {
         return (*this = Color::_blendMode(*this, c));
@@ -398,7 +415,7 @@ public:
     }
 
 private:
-    static Color (*_blendMode)(Color const&, Color const&);
+    static BlendMode_t _blendMode;
 
 
     /**

@@ -14,6 +14,12 @@ Pusar Engine - Based on Vulkan
 # Build
 TODO
 
+## Windows / MSYS2
+https://www.msys2.org/
+
+```sh
+pacman -S mingw64/mingw-w64-x86_64-{gcc,make,vulkan-devel,glm,glfw}
+```
 
 # VS Code configuration
 
@@ -21,10 +27,12 @@ TODO
 https://www.msys2.org/
 
 ### Git
-https://git-scm.com/
+https://git-scm.com/ *
+
+\* git package for msys2 is known to not working well under VS Code
+
 
 ### C/Cpp IntelliSense
-
 Update `includePath` in file `.vscode/c_cpp_properties.json` with the outputs of the following command :
 
 ```sh
@@ -45,7 +53,6 @@ Furthermore, in file `.vscode/settings.json` you can add :
 
 
 ### Integrated Terminal
-
 In file `.vscode/settings.json` :
 ```json
 "terminal.integrated.shell.windows": "C:\\msys64\\usr\\bin\\bash.exe",
@@ -61,5 +68,28 @@ In file `.vscode/settings.json` :
 ### Tasks
 TODO
 
-### Debugger
-TODO
+### Debugger - gdb
+Install package `mingw64/mingw-w64-x86_64-gdb` then add the following configuration to your launch.json
+```json
+"windows": {
+    "miDebuggerPath": "C:/msys64/mingw64/bin/gdb.exe"
+}
+```
+
+Don't forget to build in debug mode before lauching : 
+```sh
+make dbg
+```
+
+You can define multiple configurations to launch the unit tests and the main program :
+```json
+"windows": {
+    "program": "${workspaceFolder}/test/run_unittest.exe"
+}
+```
+or
+```json
+"windows": {
+    "program": "${workspaceFolder}/buid/pulsar.exe"
+}
+```

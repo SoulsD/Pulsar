@@ -2,6 +2,10 @@
     "files.associations": {
         ".clang-format": "yaml",
     },
+    "files.exclude": {
+        "**/*.o": true,
+        "**/*.exe": true
+    },
     "editor.tabSize": 4,
     "editor.insertSpaces": true,
     "editor.formatOnPaste": false,
