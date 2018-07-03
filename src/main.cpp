@@ -1,8 +1,13 @@
-#define GLFW_INCLUDE_VULKAN
+// glfwGetWin32Window
+#define GLFW_EXPOSE_NATIVE_WIN32
+
 #define VULKAN_HPP_TYPESAFE_CONVERSION
-#include <glfw/glfw3.h>
-#include <glm/glm.hpp>
+#define VK_USE_PLATFORM_WIN32_KHR
 #include <vulkan/vulkan.hpp>
+
+#include <glfw/glfw3.h>
+#include <glfw/glfw3native.h>  // glfwGetWin32Window
+#include <glm/glm.hpp>
 #include <iostream>
 #include <algorithm>
 #include <set>
@@ -251,19 +256,20 @@ private:
 
 #endif
 
-    void createSurface()
+    /* FIXME: */
+    void __win32CreateWindowSurface()
     {
-        VkSurfaceKHR surface;
-        int32_t result;
+        vk::Win32SurfaceCreateInfoKHR surfaceInfo;
 
-        if ((result = glfwCreateWindowSurface(
-                 (VkInstance) this->_instance, this->_window, nullptr, &surface))
-            != VK_SUCCESS) {
-            std::cout << "result : " << result << std::endl;
-            throw std::runtime_error("failed to create window surface!");
-        }
-        this->_surface = surface;
+        surfaceInfo.setHinstance(GetModuleHandle(nullptr))
+            .setHwnd(glfwGetWin32Window(this->_window));
+
+
+        this->_surface = this->_instance.createWin32SurfaceKHR(
+            surfaceInfo, nullptr, this->_dispatchLoader);
     }
+
+    void createSurface() { __win32CreateWindowSurface(); }
 
     struct QueueFamilyIndices {
         int graphicsFamily = -1;
@@ -310,7 +316,8 @@ private:
 
         if (indices.isComplete()
             /*properties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu
-             && features.geometryShader*/) {
+             && features.geometryShader*/)
+        {
             isSuitable = true;
         }
 
@@ -334,8 +341,8 @@ private:
         std::cout << "Physical Devices :" << std::endl;
         // ?TODO: Use an ordered map to automatically sort candidates by increasing score
 
-        for (auto const& device : devices) {
-            if (!selected && isDeviceSuitable(device)) {
+        for (vk::PhysicalDevice const& device : devices) {
+            if (isDeviceSuitable(device) && !selected) {
                 this->_physicalDevice = device;
 
                 selected = true;
