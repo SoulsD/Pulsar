@@ -56,7 +56,11 @@ private:
     vk::Queue _graphicsQueue;
     vk::Queue _presentQueue;
     vk::SurfaceKHR _surface;
+
     vk::SwapchainKHR _swapChain;
+    std::vector<vk::Image> _swapChainImages;
+    vk::Format _swapChainFormat;
+    vk::Extent2D _swapChainExtent;
 
 #ifdef ADD_VALIDATION_LAYERS
     const std::vector<const char*> requiredValidationLayers = VALIDATION_LAYERS;
@@ -562,7 +566,11 @@ private:
             .setClipped(VK_TRUE)
             // .setOldSwapchain()
             ;
-        this->_swapChain = this->_device.createSwapchainKHR(swapChainInfo);
+        this->_swapChain       = this->_device.createSwapchainKHR(swapChainInfo);
+        this->_swapChainImages = this->_device.getSwapchainImagesKHR(this->_swapChain);
+
+        this->_swapChainFormat = surfaceFormat.format;
+        this->_swapChainExtent = extent;
     }
 };
 
