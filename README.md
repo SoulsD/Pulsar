@@ -37,16 +37,15 @@ https://git-scm.com/ *
 
 
 ### C/Cpp IntelliSense
-Update `includePath` in file `.vscode/c_cpp_properties.json` with the output of the following command :
+Update configuration in file `.vscode/c_cpp_properties.json` with the the following:
 
-```sh
-echo | gcc -Wp,-v -x c++ - -fsyntax-only
-```
-
-and add the following to `defines` :
 ```json
-"__GNUC__=7",
-"__cdecl=__attribute__((__cdecl__))"
+"compilerPath": "C:/msys64/mingw64/bin/gcc",
+"defines": [
+    // ...
+    "__GNUC__=7",
+    "__cdecl=__attribute__((__cdecl__))"
+]
 ```
 
 Moreover, in file `.vscode/settings.json` you can add :

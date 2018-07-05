@@ -2,15 +2,9 @@
     "configurations": [
         {
             "name": "Msys64",
+            "compilerPath": "C:/msys64/mingw64/bin/gcc",
             "includePath": [
-                "${workspaceFolder}/include",
-                "C:/msys64/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/7.3.0/../../../../include/c++/7.3.0",
-                "C:/msys64/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/7.3.0/../../../../include/c++/7.3.0/x86_64-w64-mingw32",
-                "C:/msys64/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/7.3.0/../../../../include/c++/7.3.0/backward",
-                "C:/msys64/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/7.3.0/include",
-                "C:/msys64/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/7.3.0/../../../../include",
-                "C:/msys64/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/7.3.0/include-fixed",
-                "C:/msys64/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/7.3.0/../../../../x86_64-w64-mingw32/include"
+                "${workspaceFolder}/include"
             ],
             "defines": [
                 "_DEBUG",
@@ -22,14 +16,7 @@
             "intelliSenseMode": "clang-x64",
             "browse": {
                 "path": [
-                    "${workspaceFolder}",
-                    "C:/msys64/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/7.3.0/../../../../include/c++/7.3.0",
-                    "C:/msys64/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/7.3.0/../../../../include/c++/7.3.0/x86_64-w64-mingw32",
-                    "C:/msys64/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/7.3.0/../../../../include/c++/7.3.0/backward",
-                    "C:/msys64/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/7.3.0/include",
-                    "C:/msys64/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/7.3.0/../../../../include",
-                    "C:/msys64/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/7.3.0/include-fixed",
-                    "C:/msys64/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/7.3.0/../../../../x86_64-w64-mingw32/include"
+                    "${workspaceFolder}"
                 ],
                 "limitSymbolsToIncludedHeaders": true,
                 "databaseFilename": ""

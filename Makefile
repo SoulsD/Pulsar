@@ -63,5 +63,5 @@ release: CXXFLAGS += -DNDEBUG
 release: $(NAME)
 
 .cpp.o:
-	@echo $(CXX) -c $(CXXFLAGS) $<
+	@$(ECHO) $(CXX) -c $(CXXFLAGS) $<
 	@$(CXX) -c $(CXXFLAGS) $< -o $@
