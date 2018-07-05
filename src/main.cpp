@@ -55,12 +55,13 @@ private:
     vk::Device _device;
     vk::Queue _graphicsQueue;
     vk::Queue _presentQueue;
-    vk::SurfaceKHR _surface;
 
+    vk::SurfaceKHR _surface;
     vk::SwapchainKHR _swapChain;
-    std::vector<vk::Image> _swapChainImages;
     vk::Format _swapChainFormat;
     vk::Extent2D _swapChainExtent;
+    std::vector<vk::Image> _swapChainImages;
+    std::vector<VkImageView> _swapChainImageViews;
 
 #ifdef ADD_VALIDATION_LAYERS
     const std::vector<const char*> requiredValidationLayers = VALIDATION_LAYERS;
@@ -123,6 +124,7 @@ private:
         pickPhysicalDevice();
         createLogicalDevice();
         createSwapChain();
+        createImageViews();
     }
 
     void createInstance()
@@ -158,6 +160,9 @@ private:
 
     void cleanup()
     {
+        for (auto& imageView : this->_swapChainImageViews) {
+            this->_device.destroyImageView(imageView);
+        }
         this->_device.destroySwapchainKHR(this->_swapChain);
         this->_device.destroy();
 #ifdef ADD_VALIDATION_LAYERS
@@ -571,6 +576,29 @@ private:
 
         this->_swapChainFormat = surfaceFormat.format;
         this->_swapChainExtent = extent;
+    }
+
+    void createImageViews()
+    {
+        this->_swapChainImageViews.resize(this->_swapChainImages.size());
+
+        for (vk::Image image : this->_swapChainImages) {
+            vk::ImageViewCreateInfo imageViewInfo;
+
+            imageViewInfo.setImage(image)
+                .setViewType(vk::ImageViewType::e2D)
+                .setFormat(this->_swapChainFormat)
+                .setComponents(vk::ComponentMapping())
+                .setSubresourceRange(vk::ImageSubresourceRange()
+                                         .setAspectMask(vk::ImageAspectFlagBits::eColor)
+                                         .setBaseMipLevel(0)
+                                         .setLevelCount(1)
+                                         .setBaseArrayLayer(0)
+                                         .setLayerCount(1));
+
+            this->_swapChainImageViews.push_back(
+                this->_device.createImageView(imageViewInfo));
+        }
     }
 };
 
