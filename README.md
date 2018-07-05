@@ -3,28 +3,32 @@ Pusar Engine - Based on Vulkan
 
 - [Pulsar](#pulsar)
 - [Build](#build)
+    - [Windows / MSYS2 (Mingw64)](#windows--msys2-mingw64)
 - [VS Code configuration](#vs-code-configuration)
-    - [Windows / MSYS2](#windows---msys2)
+    - [Windows / MSYS2](#windows--msys2)
         - [Git](#git)
-        - [C/Cpp IntelliSense](#c-cpp-intellisense)
+        - [C/Cpp IntelliSense](#ccpp-intellisense)
+        - [Code formatting - clang-format](#code-formatting---clang-format)
         - [Integrated Terminal](#integrated-terminal)
         - [Tasks](#tasks)
-        - [Debugger](#debugger)
+        - [Debugger - gdb](#debugger---gdb)
 
 # Build
 TODO
 
-## Windows / MSYS2
+## Windows / MSYS2 (Mingw64)
 https://www.msys2.org/
 
 ```sh
-pacman -S mingw64/mingw-w64-x86_64-{gcc,make,vulkan-devel,glm,glfw}
+pacman -S mingw64/mingw-w64-x86_64-{gcc,make,vulkan,glslang,glm,glfw}
+# optional : mingw64/mingw-w64-x86_64-{spirv-tools,vulkan-man-pages}
 ```
 
 # VS Code configuration
 
 ## Windows / MSYS2
 https://www.msys2.org/
+
 
 ### Git
 https://git-scm.com/ *
@@ -33,21 +37,33 @@ https://git-scm.com/ *
 
 
 ### C/Cpp IntelliSense
-Update `includePath` in file `.vscode/c_cpp_properties.json` with the outputs of the following command :
+Update `includePath` in file `.vscode/c_cpp_properties.json` with the output of the following command :
 
 ```sh
 echo | gcc -Wp,-v -x c++ - -fsyntax-only
 ```
 
-and add the following `defines` :
+and add the following to `defines` :
 ```json
 "__GNUC__=7",
 "__cdecl=__attribute__((__cdecl__))"
 ```
 
-Furthermore, in file `.vscode/settings.json` you can add :
+Moreover, in file `.vscode/settings.json` you can add :
 ```json
 "C_Cpp.intelliSenseEngine": "Default",
+```
+
+
+### Code formatting - clang-format
+
+```sh
+pacman -S mingw64/mingw-w64-x86_64-clang
+```
+
+In file `.vscode/settings.json` you can then add :
+```json
+"editor.formatOnSave": true,
 "C_Cpp.clang_format_path": "C:\\msys64\\mingw64\\bin\\clang-format.exe",
 ```
 
@@ -65,11 +81,13 @@ In file `.vscode/settings.json` :
 }
 ```
 
+
 ### Tasks
 TODO
 
 ### Debugger - gdb
-Install package `mingw64/mingw-w64-x86_64-gdb` then add the following configuration to your launch.json
+Install package `mingw64/mingw-w64-x86_64-gdb` then modify the default configuration of your `.vscode/launch.json`
+
 ```json
 "windows": {
     "miDebuggerPath": "C:/msys64/mingw64/bin/gdb.exe"
