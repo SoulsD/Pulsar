@@ -10,6 +10,7 @@
 #include <glm/glm.hpp>
 #include <iostream>
 #include <algorithm>
+#include <list>
 #include <set>
 #include <stdexcept>
 
@@ -17,12 +18,10 @@
 // - Validation Layers / vk_layer_settings.txt
 // - Create own DispatchLoader ? (vkGetInstanceProcAddr)
 
-#ifndef NDEBUG
-#include <list>
-
 #define REQUIRED_EXTENTIONS \
     {}
 
+#ifndef NDEBUG
 // TODO: enable layers
 #define ADD_VALIDATION_LAYERS
 #define VALIDATION_LAYERS \
@@ -125,6 +124,7 @@ private:
         createLogicalDevice();
         createSwapChain();
         createImageViews();
+        createGraphicsPipeline();
     }
 
     void createInstance()
@@ -600,6 +600,8 @@ private:
                 this->_device.createImageView(imageViewInfo));
         }
     }
+
+    void createGraphicsPipeline() {}
 };
 
 int main()

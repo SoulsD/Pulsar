@@ -58,7 +58,7 @@ fclean: clean
 
 re: fclean all
 
-release: CXXFLAGS -= $(DBGFLAGS)
+release: CXXFLAGS := $(filter-out $(DBGFLAGS),$(CXXFLAGS))
 release: CXXFLAGS += -DNDEBUG
 release: $(NAME)
 
