@@ -8,6 +8,7 @@
 #include <glfw/glfw3.h>
 #include <glfw/glfw3native.h>  // glfwGetWin32Window
 #include <glm/glm.hpp>
+#include <fstream>
 #include <iostream>
 #include <algorithm>
 #include <list>
@@ -24,12 +25,10 @@
 #ifndef NDEBUG
 // TODO: enable layers
 #define ADD_VALIDATION_LAYERS
-#define VALIDATION_LAYERS \
-    {}
-// #define VALIDATION_LAYERS
-//     {
-//         "VK_LAYER_LUNARG_standard_validation"
-//     }
+#define VALIDATION_LAYERS                         \
+    { /* "VK_LAYER_LUNARG_standard_validation" */ \
+    }
+
 #define VALIDATION_LAYERS_REQUIRED_EXTENTIONS \
     {                                         \
         VK_EXT_DEBUG_REPORT_EXTENSION_NAME    \
@@ -61,6 +60,9 @@ private:
     vk::Extent2D _swapChainExtent;
     std::vector<vk::Image> _swapChainImages;
     std::vector<VkImageView> _swapChainImageViews;
+
+    static constexpr auto vertShaderFile = "build/shaders/default.vert.spv";
+    static constexpr auto fragShaderFile = "build/shaders/default.frag.spv";
 
 #ifdef ADD_VALIDATION_LAYERS
     const std::vector<const char*> requiredValidationLayers = VALIDATION_LAYERS;
@@ -601,7 +603,61 @@ private:
         }
     }
 
-    void createGraphicsPipeline() {}
+    static std::vector<char> readFile(std::string const& filename)
+    {
+        std::ifstream file(filename, std::ios::ate | std::ios::binary);
+
+        if (!file.is_open()) {
+            throw std::runtime_error("failed to open file!");
+        }
+        size_t fileSize = file.tellg();
+        std::vector<char> buffer(fileSize);
+
+        file.seekg(0);
+        file.read(buffer.data(), fileSize);
+        file.close();
+
+        return buffer;
+    }
+
+    vk::ShaderModule createShaderModule(std::vector<char> const& code)
+    {
+        vk::ShaderModuleCreateInfo shaderModuleInfo;
+
+        shaderModuleInfo
+            .setCodeSize(code.size())  // byte size
+            .setPCode(reinterpret_cast<uint32_t const*>(code.data()));
+
+        return this->_device.createShaderModule(shaderModuleInfo);
+    }
+
+    void createGraphicsPipeline()
+    {
+        auto vertShaderCode   = readFile(PulsarApp::vertShaderFile);
+        auto vertShaderModule = createShaderModule(vertShaderCode);
+        vk::PipelineShaderStageCreateInfo vertShaderStageInfo;
+
+        vertShaderStageInfo.setStage(vk::ShaderStageFlagBits::eVertex)
+            .setModule(vertShaderModule)
+            .setPName("main")
+            .setPSpecializationInfo(nullptr);
+
+        auto fragShaderCode   = readFile(PulsarApp::fragShaderFile);
+        auto fragShaderModule = createShaderModule(fragShaderCode);
+        vk::PipelineShaderStageCreateInfo fragShaderStageInfo;
+
+        fragShaderStageInfo.setStage(vk::ShaderStageFlagBits::eFragment)
+            .setModule(fragShaderModule)
+            .setPName("main")
+            .setPSpecializationInfo(nullptr);
+
+        vk::PipelineShaderStageCreateInfo shaderStages[]
+            = { vertShaderStageInfo, fragShaderStageInfo };
+
+
+        this->_device.destroyShaderModule(vertShaderModule);
+        this->_device.destroyShaderModule(fragShaderModule);
+    }
 };
 
 int main()

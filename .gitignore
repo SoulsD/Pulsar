@@ -33,3 +33,4 @@
 
 # Compilation output
 build/
+*.spv

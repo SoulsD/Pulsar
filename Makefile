@@ -5,6 +5,8 @@ BUILDDIR	= build/
 SRCDIR		= src/
 INCDIR		= include/
 TESTDIR		= test/
+SHADERSDIR	= shaders/
+SPVDIR		= $(BUILDDIR)$(SHADERSDIR)
 
 PULSAR_SRC	= $(SRCDIR)main.cpp
 PULSAR_OBJS	= $(PULSAR_SRC:.cpp=.o)
@@ -15,6 +17,9 @@ TEST_SRC	= $(TESTDIR)headers/ColorUnittest.cpp
 TEST_OBJS	= $(TEST_SRC:.cpp=.o)
 
 PULSAR_INC	= -I $(INCDIR)
+
+SHADERS		= $(SHADERSDIR)default.vert \
+				$(SHADERSDIR)default.frag
 
 DBGFLAGS	+= -g -ggdb
 
@@ -30,12 +35,14 @@ LDFLAGS		+= -lglfw3
 CXX			= g++
 ECHO		= echo
 RM			= rm -f
+GLSLANGVAL	= glslangValidator
 
 
-all: $(NAME) test
+all: $(NAME) test shaders
 
 dir:
 	@mkdir $(BUILDDIR) 2> /dev/null || true
+	@mkdir $(SPVDIR) 2> /dev/null || true
 
 $(NAME): dir $(OBJS)
 	@$(ECHO) $(CXX) -o $(NAME) $(LDFLAGS)
@@ -46,6 +53,14 @@ test: $(TEST_OBJS)
 	@$(ECHO) $(CXX) -o $(TEST_NAME) $(LDFLAGS)
 	@$(CXX) -o $(TESTDIR)$(TEST_NAME) $(TEST_OBJS) $(LDFLAGS)
 
+shaders: dir
+	@$(ECHO) Compiling shaders ...
+	@for shader in $(SHADERS); do \
+		res_shader=$(SPVDIR)`basename $$shader`.spv ; \
+		$(GLSLANGVAL) -V $$shader -o $$res_shader \
+		&& $(ECHO) ' =>' $$res_shader ; \
+	done
+
 clean:
 	@$(ECHO) $(RM) OBJS
 	@$(RM) $(OBJS)
@@ -54,6 +69,7 @@ clean:
 
 fclean: clean
 	$(RM) $(BUILDDIR)$(NAME)
+	$(RM) $(SPVDIR)*.spv
 	$(RM) $(TESTDIR)$(TEST_NAME)
 
 re: fclean all
@@ -65,3 +81,5 @@ release: $(NAME)
 .cpp.o:
 	@$(ECHO) $(CXX) -c $(CXXFLAGS) $<
 	@$(CXX) -c $(CXXFLAGS) $< -o $@
+
+.PHONY: all test shaders clean fclean release

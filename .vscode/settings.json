@@ -4,7 +4,8 @@
     },
     "files.exclude": {
         "**/*.o": true,
-        "**/*.exe": true
+        "**/*.exe": true,
+        "**/*.spv": true
     },
     "editor.tabSize": 4,
     "editor.insertSpaces": true,
@@ -19,5 +20,6 @@
     "terminal.integrated.env.windows": {
         "CHERE_INVOKING": "1",
         "MSYSTEM": "MINGW64"
-    }
+    },
+    // "glsllint.glslangValidatorPath": "C:/msys64/mingw64/bin/glslangValidator.exe"
 }
