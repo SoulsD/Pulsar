@@ -64,6 +64,8 @@ private:
     static constexpr auto vertShaderFile = "build/shaders/default.vert.spv";
     static constexpr auto fragShaderFile = "build/shaders/default.frag.spv";
 
+    vk::PipelineLayout _pipelineLayout;
+
 #ifdef ADD_VALIDATION_LAYERS
     const std::vector<const char*> requiredValidationLayers = VALIDATION_LAYERS;
 #endif
@@ -162,6 +164,7 @@ private:
 
     void cleanup()
     {
+        this->_device.destroyPipelineLayout(this->_pipelineLayout);
         for (auto& imageView : this->_swapChainImageViews) {
             this->_device.destroyImageView(imageView);
         }
@@ -654,6 +657,123 @@ private:
         vk::PipelineShaderStageCreateInfo shaderStages[]
             = { vertShaderStageInfo, fragShaderStageInfo };
 
+        /* Fixed functions */
+        /* -> Vertex input */
+        vk::PipelineVertexInputStateCreateInfo vertexInputInfo;
+        {
+            vertexInputInfo.setVertexBindingDescriptionCount(0)
+                .setPVertexBindingDescriptions(nullptr)
+                .setVertexAttributeDescriptionCount(0)
+                .setPVertexAttributeDescriptions(nullptr);
+        }
+
+        /* -> Input assembly */
+        vk::PipelineInputAssemblyStateCreateInfo inputAssemblyInfo;
+        {
+            inputAssemblyInfo.setTopology(vk::PrimitiveTopology::eTriangleList)
+                .setPrimitiveRestartEnable(VK_FALSE);
+        }
+
+        /* -> Viewports & scissors */
+        vk::PipelineViewportStateCreateInfo viewportStateInfo;
+        {
+            vk::Viewport viewport;
+            vk::Rect2D scissor;
+
+            viewport.setX(0.0f)
+                .setY(0.0f)
+                .setWidth(this->_swapChainExtent.width)
+                .setHeight(this->_swapChainExtent.height)
+                .setMinDepth(0.0f)
+                .setMaxDepth(1.0f);
+
+            scissor.setOffset(vk::Offset2D(0, 0)).setExtent(this->_swapChainExtent);
+
+            viewportStateInfo.setViewportCount(1)
+                .setPViewports(&viewport)
+                .setScissorCount(1)
+                .setPScissors(&scissor);
+        }
+
+        /* -> Rasterizer */
+        vk::PipelineRasterizationStateCreateInfo rasterizerInfo;
+        {
+            rasterizerInfo.setDepthClampEnable(VK_FALSE)
+                .setRasterizerDiscardEnable(VK_FALSE)
+                .setPolygonMode(vk::PolygonMode::eFill)
+                .setLineWidth(1.0f)
+                .setCullMode(vk::CullModeFlagBits::eBack)
+                .setFrontFace(vk::FrontFace::eClockwise)
+                .setDepthBiasEnable(VK_FALSE)
+                .setDepthBiasConstantFactor(0.0f)
+                .setDepthBiasClamp(0.0f)
+                .setDepthBiasSlopeFactor(0.0f);
+        }
+
+        /* -> Multisampling */
+        vk::PipelineMultisampleStateCreateInfo multisamplingInfo;
+        {
+            multisamplingInfo.setSampleShadingEnable(VK_FALSE)
+                .setRasterizationSamples(vk::SampleCountFlagBits::e1)
+                .setMinSampleShading(1.0f)
+                .setPSampleMask(nullptr)
+                .setAlphaToCoverageEnable(VK_FALSE)
+                .setAlphaToOneEnable(VK_FALSE);
+        }
+
+        /* -> Depth and stencil testing */
+        vk::PipelineDepthStencilStateCreateInfo depthStencilInfo;
+        {
+            //
+        }
+
+        /* -> Color blending */
+        vk::PipelineColorBlendStateCreateInfo colorBlendingInfo;
+        {
+            vk::PipelineColorBlendAttachmentState colorBlendAttachment;
+
+            colorBlendAttachment
+                .setColorWriteMask(
+                    vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG
+                    | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA)
+                .setBlendEnable(VK_FALSE)
+                .setSrcColorBlendFactor(vk::BlendFactor::eOne)
+                .setDstColorBlendFactor(vk::BlendFactor::eZero)
+                .setColorBlendOp(vk::BlendOp::eAdd)
+                .setSrcAlphaBlendFactor(vk::BlendFactor::eOne)
+                .setDstAlphaBlendFactor(vk::BlendFactor::eZero)
+                .setAlphaBlendOp(vk::BlendOp::eAdd);
+
+            colorBlendingInfo.setLogicOpEnable(VK_FALSE)
+                .setLogicOp(vk::LogicOp::eCopy)
+                .setAttachmentCount(1)
+                .setPAttachments(&colorBlendAttachment)
+                .setBlendConstants({ 0.0f, 0.0f, 0.0f, 0.0f });
+        }
+
+        /* -> Dynamic state */
+        vk::PipelineDynamicStateCreateInfo dynamicStateInfo;
+        {
+            vk::DynamicState dynamicStates[] = {
+                // vk::DynamicState::eViewport,
+                // vk::DynamicState::eLineWidth
+            };
+
+            // dynamicStateInfo.setDynamicStateCount(2).setPDynamicStates(dynamicStates);
+        }
+
+        /* -> Pipeline layout */
+        vk::PipelineLayoutCreateInfo pipelineLayoutInfo;
+        {
+            pipelineLayoutInfo.setSetLayoutCount(0)
+                .setPSetLayouts(nullptr)
+                .setPushConstantRangeCount(0)
+                .setPPushConstantRanges(nullptr);
+            this->_pipelineLayout
+                = this->_device.createPipelineLayout(pipelineLayoutInfo);
+        }
+
+        /* !Fixed functions */
 
         this->_device.destroyShaderModule(vertShaderModule);
         this->_device.destroyShaderModule(fragShaderModule);
