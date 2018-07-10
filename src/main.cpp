@@ -66,6 +66,7 @@ private:
 
     vk::RenderPass _renderPass;
     vk::PipelineLayout _pipelineLayout;
+    vk::Pipeline _graphicsPipeline;
 
 #ifdef ADD_VALIDATION_LAYERS
     const std::vector<const char*> requiredValidationLayers = VALIDATION_LAYERS;
@@ -166,6 +167,7 @@ private:
 
     void cleanup()
     {
+        this->_device.destroyPipeline(this->_graphicsPipeline);
         this->_device.destroyPipelineLayout(this->_pipelineLayout);
         this->_device.destroyRenderPass(this->_renderPass);
         for (auto& imageView : this->_swapChainImageViews) {
@@ -803,10 +805,10 @@ private:
         /* -> Dynamic state */
         vk::PipelineDynamicStateCreateInfo dynamicStateInfo;
         {
-            vk::DynamicState dynamicStates[] = {
-                // vk::DynamicState::eViewport,
-                // vk::DynamicState::eLineWidth
-            };
+            // vk::DynamicState dynamicStates[] = {
+            //     vk::DynamicState::eViewport,
+            //     vk::DynamicState::eLineWidth
+            // };
 
             // dynamicStateInfo.setDynamicStateCount(2).setPDynamicStates(dynamicStates);
         }
@@ -821,8 +823,31 @@ private:
             this->_pipelineLayout
                 = this->_device.createPipelineLayout(pipelineLayoutInfo);
         }
-
         /* !Fixed functions */
+
+        /* Graphics pipeline creation */
+        vk::GraphicsPipelineCreateInfo pipelineInfo;
+        {
+            pipelineInfo.setStageCount(2)
+                .setPStages(shaderStages)
+                .setPVertexInputState(&vertexInputInfo)
+                .setPInputAssemblyState(&inputAssemblyInfo)
+                .setPViewportState(&viewportStateInfo)
+                .setPRasterizationState(&rasterizerInfo)
+                .setPMultisampleState(&multisamplingInfo)
+                .setPDepthStencilState(nullptr)
+                .setPColorBlendState(&colorBlendingInfo)
+                .setPDynamicState(nullptr)
+                .setLayout(this->_pipelineLayout)
+                .setRenderPass(this->_renderPass)
+                .setSubpass(0)
+                // .setBasePipelineHandle(nullptr)
+                // .setBasePipelineIndex(0)
+                ;
+        }
+
+        this->_graphicsPipeline
+            = this->_device.createGraphicsPipeline(vk::PipelineCache(), pipelineInfo);
 
         this->_device.destroyShaderModule(vertShaderModule);
         this->_device.destroyShaderModule(fragShaderModule);
