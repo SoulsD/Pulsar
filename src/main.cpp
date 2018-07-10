@@ -64,6 +64,7 @@ private:
     static constexpr auto vertShaderFile = "build/shaders/default.vert.spv";
     static constexpr auto fragShaderFile = "build/shaders/default.frag.spv";
 
+    vk::RenderPass _renderPass;
     vk::PipelineLayout _pipelineLayout;
 
 #ifdef ADD_VALIDATION_LAYERS
@@ -128,6 +129,7 @@ private:
         createLogicalDevice();
         createSwapChain();
         createImageViews();
+        createRenderPass();
         createGraphicsPipeline();
     }
 
@@ -165,6 +167,7 @@ private:
     void cleanup()
     {
         this->_device.destroyPipelineLayout(this->_pipelineLayout);
+        this->_device.destroyRenderPass(this->_renderPass);
         for (auto& imageView : this->_swapChainImageViews) {
             this->_device.destroyImageView(imageView);
         }
@@ -604,6 +607,40 @@ private:
             this->_swapChainImageViews.push_back(
                 this->_device.createImageView(imageViewInfo));
         }
+    }
+
+    void createRenderPass()
+    {
+        vk::AttachmentDescription colorAttachment;
+
+        colorAttachment.setFormat(this->_swapChainFormat)
+            .setSamples(vk::SampleCountFlagBits::e1)
+            .setLoadOp(vk::AttachmentLoadOp::eClear)
+            .setStoreOp(vk::AttachmentStoreOp::eStore)
+            .setStencilLoadOp(vk::AttachmentLoadOp::eDontCare)
+            .setStencilStoreOp(vk::AttachmentStoreOp::eDontCare)
+            .setInitialLayout(vk::ImageLayout::eUndefined)
+            .setFinalLayout(vk::ImageLayout::ePresentSrcKHR);
+
+        vk::AttachmentReference colorAttachmentRef;
+
+        colorAttachmentRef.setAttachment(0).setLayout(
+            vk::ImageLayout::eColorAttachmentOptimal);
+
+        vk::SubpassDescription subpass;
+
+        subpass.setPipelineBindPoint(vk::PipelineBindPoint::eGraphics)
+            .setColorAttachmentCount(1)
+            .setPColorAttachments(&colorAttachmentRef);
+
+        vk::RenderPassCreateInfo renderPassInfo;
+
+        renderPassInfo.setAttachmentCount(1)
+            .setPAttachments(&colorAttachment)
+            .setSubpassCount(1)
+            .setPSubpasses(&subpass);
+
+        this->_renderPass = this->_device.createRenderPass(renderPassInfo);
     }
 
     static std::vector<char> readFile(std::string const& filename)
