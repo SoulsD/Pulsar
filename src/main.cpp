@@ -67,6 +67,7 @@ private:
     vk::RenderPass _renderPass;
     vk::PipelineLayout _pipelineLayout;
     vk::Pipeline _graphicsPipeline;
+    std::vector<vk::Framebuffer> _swapChainFramebuffers;
 
 #ifdef ADD_VALIDATION_LAYERS
     const std::vector<const char*> requiredValidationLayers = VALIDATION_LAYERS;
@@ -132,6 +133,7 @@ private:
         createImageViews();
         createRenderPass();
         createGraphicsPipeline();
+        createFramebuffers();
     }
 
     void createInstance()
@@ -167,6 +169,9 @@ private:
 
     void cleanup()
     {
+        for (auto& framebuffer : this->_swapChainFramebuffers) {
+            this->_device.destroyFramebuffer(framebuffer);
+        }
         this->_device.destroyPipeline(this->_graphicsPipeline);
         this->_device.destroyPipelineLayout(this->_pipelineLayout);
         this->_device.destroyRenderPass(this->_renderPass);
@@ -590,9 +595,9 @@ private:
 
     void createImageViews()
     {
-        this->_swapChainImageViews.resize(this->_swapChainImages.size());
+        this->_swapChainImageViews.reserve(this->_swapChainImages.size());
 
-        for (vk::Image image : this->_swapChainImages) {
+        for (vk::Image const& image : this->_swapChainImages) {
             vk::ImageViewCreateInfo imageViewInfo;
 
             imageViewInfo.setImage(image)
@@ -851,6 +856,26 @@ private:
 
         this->_device.destroyShaderModule(vertShaderModule);
         this->_device.destroyShaderModule(fragShaderModule);
+    }
+
+    void createFramebuffers()
+    {
+        this->_swapChainFramebuffers.reserve(this->_swapChainImageViews.size());
+
+        for (vk::ImageView const& imageView : this->_swapChainImageViews) {
+            vk::FramebufferCreateInfo framebufferInfo;
+            vk::ImageView attachments[] = { imageView };
+
+            framebufferInfo.setRenderPass(this->_renderPass)
+                .setAttachmentCount(1)
+                .setPAttachments(attachments)
+                .setWidth(this->_swapChainExtent.width)
+                .setHeight(this->_swapChainExtent.height)
+                .setLayers(1);
+
+            this->_swapChainFramebuffers.push_back(
+                this->_device.createFramebuffer(framebufferInfo));
+        }
     }
 };
 
