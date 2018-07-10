@@ -281,7 +281,7 @@ private:
     void setupDebugCallback()
     {
         GLFWerrorfun error_callback = [](int code, const char* desc) -> void {
-            std::cout << "glfw: " << code << " | " << desc << std::endl;
+            std::cout << "glfw: [" << code << "] " << desc << std::endl;
         };
         glfwSetErrorCallback(error_callback);
 
@@ -612,33 +612,37 @@ private:
     void createRenderPass()
     {
         vk::AttachmentDescription colorAttachment;
-
-        colorAttachment.setFormat(this->_swapChainFormat)
-            .setSamples(vk::SampleCountFlagBits::e1)
-            .setLoadOp(vk::AttachmentLoadOp::eClear)
-            .setStoreOp(vk::AttachmentStoreOp::eStore)
-            .setStencilLoadOp(vk::AttachmentLoadOp::eDontCare)
-            .setStencilStoreOp(vk::AttachmentStoreOp::eDontCare)
-            .setInitialLayout(vk::ImageLayout::eUndefined)
-            .setFinalLayout(vk::ImageLayout::ePresentSrcKHR);
+        {
+            colorAttachment.setFormat(this->_swapChainFormat)
+                .setSamples(vk::SampleCountFlagBits::e1)
+                .setLoadOp(vk::AttachmentLoadOp::eClear)
+                .setStoreOp(vk::AttachmentStoreOp::eStore)
+                .setStencilLoadOp(vk::AttachmentLoadOp::eDontCare)
+                .setStencilStoreOp(vk::AttachmentStoreOp::eDontCare)
+                .setInitialLayout(vk::ImageLayout::eUndefined)
+                .setFinalLayout(vk::ImageLayout::ePresentSrcKHR);
+        }
 
         vk::AttachmentReference colorAttachmentRef;
-
-        colorAttachmentRef.setAttachment(0).setLayout(
-            vk::ImageLayout::eColorAttachmentOptimal);
+        {
+            colorAttachmentRef.setAttachment(0).setLayout(
+                vk::ImageLayout::eColorAttachmentOptimal);
+        }
 
         vk::SubpassDescription subpass;
-
-        subpass.setPipelineBindPoint(vk::PipelineBindPoint::eGraphics)
-            .setColorAttachmentCount(1)
-            .setPColorAttachments(&colorAttachmentRef);
+        {
+            subpass.setPipelineBindPoint(vk::PipelineBindPoint::eGraphics)
+                .setColorAttachmentCount(1)
+                .setPColorAttachments(&colorAttachmentRef);
+        }
 
         vk::RenderPassCreateInfo renderPassInfo;
-
-        renderPassInfo.setAttachmentCount(1)
-            .setPAttachments(&colorAttachment)
-            .setSubpassCount(1)
-            .setPSubpasses(&subpass);
+        {
+            renderPassInfo.setAttachmentCount(1)
+                .setPAttachments(&colorAttachment)
+                .setSubpassCount(1)
+                .setPSubpasses(&subpass);
+        }
 
         this->_renderPass = this->_device.createRenderPass(renderPassInfo);
     }
@@ -673,23 +677,31 @@ private:
 
     void createGraphicsPipeline()
     {
-        auto vertShaderCode   = readFile(PulsarApp::vertShaderFile);
-        auto vertShaderModule = createShaderModule(vertShaderCode);
+        /* Vertex Shader */
         vk::PipelineShaderStageCreateInfo vertShaderStageInfo;
+        vk::ShaderModule vertShaderModule;
+        {
+            auto vertShaderCode = readFile(PulsarApp::vertShaderFile);
+            vertShaderModule    = createShaderModule(vertShaderCode);
 
-        vertShaderStageInfo.setStage(vk::ShaderStageFlagBits::eVertex)
-            .setModule(vertShaderModule)
-            .setPName("main")
-            .setPSpecializationInfo(nullptr);
+            vertShaderStageInfo.setStage(vk::ShaderStageFlagBits::eVertex)
+                .setModule(vertShaderModule)
+                .setPName("main")
+                .setPSpecializationInfo(nullptr);
+        }
 
-        auto fragShaderCode   = readFile(PulsarApp::fragShaderFile);
-        auto fragShaderModule = createShaderModule(fragShaderCode);
+        /* Fragment Shader */
         vk::PipelineShaderStageCreateInfo fragShaderStageInfo;
+        vk::ShaderModule fragShaderModule;
+        {
+            auto fragShaderCode = readFile(PulsarApp::fragShaderFile);
+            fragShaderModule    = createShaderModule(fragShaderCode);
 
-        fragShaderStageInfo.setStage(vk::ShaderStageFlagBits::eFragment)
-            .setModule(fragShaderModule)
-            .setPName("main")
-            .setPSpecializationInfo(nullptr);
+            fragShaderStageInfo.setStage(vk::ShaderStageFlagBits::eFragment)
+                .setModule(fragShaderModule)
+                .setPName("main")
+                .setPSpecializationInfo(nullptr);
+        }
 
         vk::PipelineShaderStageCreateInfo shaderStages[]
             = { vertShaderStageInfo, fragShaderStageInfo };
