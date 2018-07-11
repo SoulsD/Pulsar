@@ -69,6 +69,9 @@ private:
     vk::Pipeline _graphicsPipeline;
     std::vector<vk::Framebuffer> _swapChainFramebuffers;
 
+    vk::CommandPool _commandPool;
+    std::vector<vk::CommandBuffer> _commandBuffers;
+
 #ifdef ADD_VALIDATION_LAYERS
     const std::vector<const char*> requiredValidationLayers = VALIDATION_LAYERS;
 #endif
@@ -89,7 +92,7 @@ public:
             std::cerr << "Error : " << e.what() << std::endl;
             return EXIT_FAILURE;
         }
-        // mainLoop();
+        mainLoop();
         cleanup();
         return EXIT_SUCCESS;
     }
@@ -110,8 +113,11 @@ private:
     {
         while (!glfwWindowShouldClose(this->_window)) {
             glfwPollEvents();
+            drawFrame();
         }
     }
+
+    void drawFrame() {}
 
     void initVulkan()
     {
@@ -134,6 +140,8 @@ private:
         createRenderPass();
         createGraphicsPipeline();
         createFramebuffers();
+        createCommandPool();
+        createCommandBuffers();
     }
 
     void createInstance()
@@ -169,6 +177,7 @@ private:
 
     void cleanup()
     {
+        this->_device.destroyCommandPool(this->_commandPool);
         for (auto& framebuffer : this->_swapChainFramebuffers) {
             this->_device.destroyFramebuffer(framebuffer);
         }
@@ -875,6 +884,65 @@ private:
 
             this->_swapChainFramebuffers.push_back(
                 this->_device.createFramebuffer(framebufferInfo));
+        }
+    }
+
+    void createCommandPool()
+    {
+        vk::CommandPoolCreateInfo commandPoolInfo;
+        QueueFamilyIndices queueFamillyIndices = findQueueFamilies(this->_physicalDevice);
+
+        commandPoolInfo.setQueueFamilyIndex(queueFamillyIndices.graphicsFamily)
+            .setFlags(vk::CommandPoolCreateFlags());
+
+        this->_commandPool = this->_device.createCommandPool(commandPoolInfo);
+    }
+
+    void createCommandBuffers()
+    {
+        vk::CommandBufferAllocateInfo commandBufferInfo;
+
+        commandBufferInfo.setCommandPool(this->_commandPool)
+            .setLevel(vk::CommandBufferLevel::ePrimary)
+            .setCommandBufferCount(this->_swapChainFramebuffers.size());
+
+        this->_commandBuffers = this->_device.allocateCommandBuffers(commandBufferInfo);
+
+        size_t i = 0;
+        for (auto const& commandBuffer : this->_commandBuffers) {
+            vk::CommandBufferBeginInfo commandBufferBeginInfo;
+
+            commandBufferBeginInfo
+                .setFlags(vk::CommandBufferUsageFlagBits::eSimultaneousUse)
+                .setPInheritanceInfo(nullptr);
+
+            commandBuffer.begin(commandBufferBeginInfo);
+            {
+                vk::RenderPassBeginInfo renderPassBeginInfo;
+                {
+                    vk::ClearValue clearColor = vk::ClearColorValue(
+                        std::array<float, 4>{ 0.0f, 0.0f, 0.0f, 1.0f });
+
+                    renderPassBeginInfo.setRenderPass(this->_renderPass)
+                        .setFramebuffer(this->_swapChainFramebuffers[i])
+                        .setRenderArea(
+                            vk::Rect2D(vk::Offset2D(0, 0), this->_swapChainExtent))
+                        .setClearValueCount(1)
+                        .setPClearValues(&clearColor);
+                }
+
+                commandBuffer.beginRenderPass(renderPassBeginInfo,
+                                              vk::SubpassContents::eInline);
+                {
+                    commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics,
+                                               this->_graphicsPipeline);
+                    commandBuffer.draw(3, 1, 0, 0);
+                }
+                commandBuffer.endRenderPass();
+            }
+            commandBuffer.end();
+
+            i += 1;
         }
     }
 };
