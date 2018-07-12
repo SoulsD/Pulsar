@@ -72,6 +72,9 @@ private:
     vk::CommandPool _commandPool;
     std::vector<vk::CommandBuffer> _commandBuffers;
 
+    vk::Semaphore _imageAvailableSemaphore;
+    vk::Semaphore _renderFinishedSemaphore;
+
 #ifdef ADD_VALIDATION_LAYERS
     const std::vector<const char*> requiredValidationLayers = VALIDATION_LAYERS;
 #endif
@@ -115,9 +118,50 @@ private:
             glfwPollEvents();
             drawFrame();
         }
+
+        this->_device.waitIdle();
     }
 
-    void drawFrame() {}
+    void drawFrame()
+    {
+        uint32_t imageIndex;
+
+        vk::ResultValue<uint32_t> result
+            = this->_device.acquireNextImageKHR(this->_swapChain,
+                                                std::numeric_limits<uint64_t>::max(),
+                                                this->_imageAvailableSemaphore,
+                                                nullptr);
+        imageIndex = result.value;
+
+        vk::Semaphore waitSemaphores[]   = { this->_imageAvailableSemaphore };
+        vk::Semaphore signalSemaphores[] = { this->_renderFinishedSemaphore };
+        vk::PipelineStageFlags waitStages[]
+            = { vk::PipelineStageFlagBits::eColorAttachmentOutput };
+        vk::SubmitInfo submitInfo;
+
+        submitInfo.setWaitSemaphoreCount(1)
+            .setPWaitSemaphores(waitSemaphores)
+            .setPWaitDstStageMask(waitStages)
+            .setCommandBufferCount(1)
+            .setPCommandBuffers(&(this->_commandBuffers[imageIndex]))
+            .setSignalSemaphoreCount(1)
+            .setPSignalSemaphores(signalSemaphores);
+
+        this->_graphicsQueue.submit({ submitInfo }, nullptr);
+
+        vk::PresentInfoKHR presentInfo;
+        vk::SwapchainKHR swapChains[] = { this->_swapChain };
+
+        presentInfo.setWaitSemaphoreCount(1)
+            .setPWaitSemaphores(signalSemaphores)
+            .setSwapchainCount(1)
+            .setPSwapchains(swapChains)
+            .setPImageIndices(&imageIndex)
+            .setPResults(nullptr);
+
+        this->_presentQueue.presentKHR(presentInfo);
+        this->_presentQueue.waitIdle();
+    }
 
     void initVulkan()
     {
@@ -142,6 +186,7 @@ private:
         createFramebuffers();
         createCommandPool();
         createCommandBuffers();
+        createSemaphores();
     }
 
     void createInstance()
@@ -177,6 +222,8 @@ private:
 
     void cleanup()
     {
+        this->_device.destroySemaphore(this->_imageAvailableSemaphore);
+        this->_device.destroySemaphore(this->_renderFinishedSemaphore);
         this->_device.destroyCommandPool(this->_commandPool);
         for (auto& framebuffer : this->_swapChainFramebuffers) {
             this->_device.destroyFramebuffer(framebuffer);
@@ -652,12 +699,24 @@ private:
                 .setPColorAttachments(&colorAttachmentRef);
         }
 
+        vk::SubpassDependency subpassDependency;
+        {
+            subpassDependency.setSrcSubpass(VK_SUBPASS_EXTERNAL)
+                .setDstSubpass(0)
+                .setSrcStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput)
+                .setSrcAccessMask(vk::AccessFlags())
+                .setDstStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput)
+                .setDstAccessMask(vk::AccessFlagBits::eColorAttachmentRead);
+        }
+
         vk::RenderPassCreateInfo renderPassInfo;
         {
             renderPassInfo.setAttachmentCount(1)
                 .setPAttachments(&colorAttachment)
                 .setSubpassCount(1)
-                .setPSubpasses(&subpass);
+                .setPSubpasses(&subpass)
+                .setDependencyCount(1)
+                .setPDependencies(&subpassDependency);
         }
 
         this->_renderPass = this->_device.createRenderPass(renderPassInfo);
@@ -944,6 +1003,14 @@ private:
 
             i += 1;
         }
+    }
+
+    void createSemaphores()
+    {
+        vk::SemaphoreCreateInfo semaphoreInfo;
+
+        this->_imageAvailableSemaphore = this->_device.createSemaphore(semaphoreInfo);
+        this->_renderFinishedSemaphore = this->_device.createSemaphore(semaphoreInfo);
     }
 };
 
