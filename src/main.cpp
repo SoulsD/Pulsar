@@ -23,10 +23,10 @@
     {}
 
 #ifndef NDEBUG
-// TODO: enable layers
 #define ADD_VALIDATION_LAYERS
-#define VALIDATION_LAYERS                         \
-    { /* "VK_LAYER_LUNARG_standard_validation" */ \
+#define VALIDATION_LAYERS                     \
+    {                                         \
+        "VK_LAYER_LUNARG_standard_validation" \
     }
 
 #define VALIDATION_LAYERS_REQUIRED_EXTENTIONS \

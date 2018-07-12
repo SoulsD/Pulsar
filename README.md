@@ -24,6 +24,11 @@ pacman -S mingw64/mingw-w64-x86_64-{gcc,make,vulkan,glslang,glm,glfw}
 # optional : mingw64/mingw-w64-x86_64-{spirv-tools,vulkan-man-pages}
 ```
 
+Add the Vulkan layers path to your environment (mandatory for debug build) :
+```sh
+export VK_LAYER_PATH=/mingw64/lib/
+```
+
 # VS Code configuration
 
 ## Windows / MSYS2
