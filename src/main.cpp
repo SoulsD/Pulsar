@@ -327,17 +327,23 @@ private:
         return checkSupport(requiredLayers, availableLayers, getLayerName);
     }
 
+    // Debug callback for validation layer messages
     static VKAPI_ATTR VkBool32 VKAPI_CALL
-    debugCallback(VkDebugReportFlagsEXT flags __attribute__((unused)),
-                  VkDebugReportObjectTypeEXT objType __attribute__((unused)),
+    debugCallback(VkDebugReportFlagsEXT flags,
+                  VkDebugReportObjectTypeEXT objType,
                   uint64_t obj __attribute__((unused)),
                   size_t location __attribute__((unused)),
                   int32_t code __attribute__((unused)),
-                  const char* layerPrefix __attribute__((unused)),
+                  const char* layerPrefix,
                   const char* msg,
                   void* userData __attribute__((unused)))
     {
-        std::cerr << "validation layer: " << msg << std::endl;
+        std::string flagsPrefix = vk::to_string(vk::DebugReportFlagsEXT(flags));
+
+        std::cerr << flagsPrefix.substr(1, flagsPrefix.size() - 2) << ": [" << layerPrefix
+                  << "][" << code << "]["
+                  << to_string(vk::DebugReportObjectTypeEXT(objType)) << "]: " << msg
+                  << std::endl;
         return VK_FALSE;
     }
 
@@ -348,11 +354,13 @@ private:
         };
         glfwSetErrorCallback(error_callback);
 
-        vk::DebugReportFlagsEXT();
         vk::DebugReportCallbackCreateInfoEXT info(
-            vk::DebugReportFlagBitsEXT::eError | vk::DebugReportFlagBitsEXT::eWarning,
+            vk::DebugReportFlagBitsEXT::eError | vk::DebugReportFlagBitsEXT::eWarning
+                | vk::DebugReportFlagBitsEXT::ePerformanceWarning,
+            // | vk::DebugReportFlagBitsEXT::eInformation
+            // | vk::DebugReportFlagBitsEXT::eDebug,
             &PulsarApp::debugCallback,
-            this);
+            nullptr);
 
         this->debugReportCallback = this->_instance.createDebugReportCallbackEXT(
             info, nullptr, this->_dispatchLoader);
