@@ -59,7 +59,7 @@ private:
     vk::Format _swapChainFormat;
     vk::Extent2D _swapChainExtent;
     std::vector<vk::Image> _swapChainImages;
-    std::vector<VkImageView> _swapChainImageViews;
+    std::vector<vk::ImageView> _swapChainImageViews;
 
     static constexpr auto vertShaderFile = "build/shaders/default.vert.spv";
     static constexpr auto fragShaderFile = "build/shaders/default.frag.spv";
@@ -72,8 +72,12 @@ private:
     vk::CommandPool _commandPool;
     std::vector<vk::CommandBuffer> _commandBuffers;
 
-    vk::Semaphore _imageAvailableSemaphore;
-    vk::Semaphore _renderFinishedSemaphore;
+    std::vector<vk::Semaphore> _imageAvailableSemaphores;
+    std::vector<vk::Semaphore> _renderFinishedSemaphores;
+    std::vector<vk::Fence> _inFlightFences;
+
+    static constexpr size_t MAX_FRAMES_IN_FLIGHT = 2;
+    size_t _currentFrame                         = 0;
 
 #ifdef ADD_VALIDATION_LAYERS
     const std::vector<const char*> requiredValidationLayers = VALIDATION_LAYERS;
@@ -87,7 +91,7 @@ public:
             initWindow();
             initVulkan();
         }
-        catch (vk::Error /*vk::SystemError*/ const& e) {
+        catch (vk::Error /*vk::SystemError || vk::LogicError*/ const& e) {
             std::cerr << "Error : " << e.what() << std::endl;
             return EXIT_FAILURE;
         }
@@ -124,17 +128,22 @@ private:
 
     void drawFrame()
     {
-        uint32_t imageIndex;
+        this->_device.waitForFences({ this->_inFlightFences[this->_currentFrame] },
+                                    VK_TRUE,
+                                    std::numeric_limits<uint64_t>::max());
+        this->_device.resetFences({ this->_inFlightFences[this->_currentFrame] });
 
-        vk::ResultValue<uint32_t> result
-            = this->_device.acquireNextImageKHR(this->_swapChain,
-                                                std::numeric_limits<uint64_t>::max(),
-                                                this->_imageAvailableSemaphore,
-                                                nullptr);
-        imageIndex = result.value;
+        vk::ResultValue<uint32_t> result = this->_device.acquireNextImageKHR(
+            this->_swapChain,
+            std::numeric_limits<uint64_t>::max(),
+            this->_imageAvailableSemaphores[this->_currentFrame],
+            nullptr);
+        uint32_t imageIndex = result.value;
 
-        vk::Semaphore waitSemaphores[]   = { this->_imageAvailableSemaphore };
-        vk::Semaphore signalSemaphores[] = { this->_renderFinishedSemaphore };
+        vk::Semaphore waitSemaphores[]
+            = { this->_imageAvailableSemaphores[this->_currentFrame] };
+        vk::Semaphore signalSemaphores[]
+            = { this->_renderFinishedSemaphores[this->_currentFrame] };
         vk::PipelineStageFlags waitStages[]
             = { vk::PipelineStageFlagBits::eColorAttachmentOutput };
         vk::SubmitInfo submitInfo;
@@ -147,7 +156,8 @@ private:
             .setSignalSemaphoreCount(1)
             .setPSignalSemaphores(signalSemaphores);
 
-        this->_graphicsQueue.submit({ submitInfo }, nullptr);
+        this->_graphicsQueue.submit({ submitInfo },
+                                    this->_inFlightFences[this->_currentFrame]);
 
         vk::PresentInfoKHR presentInfo;
         vk::SwapchainKHR swapChains[] = { this->_swapChain };
@@ -160,7 +170,9 @@ private:
             .setPResults(nullptr);
 
         this->_presentQueue.presentKHR(presentInfo);
-        this->_presentQueue.waitIdle();
+        // this->_presentQueue.waitIdle();
+
+        this->_currentFrame = (this->_currentFrame + 1) % PulsarApp::MAX_FRAMES_IN_FLIGHT;
     }
 
     void initVulkan()
@@ -186,7 +198,7 @@ private:
         createFramebuffers();
         createCommandPool();
         createCommandBuffers();
-        createSemaphores();
+        createSyncObjects();
     }
 
     void createInstance()
@@ -222,8 +234,11 @@ private:
 
     void cleanup()
     {
-        this->_device.destroySemaphore(this->_imageAvailableSemaphore);
-        this->_device.destroySemaphore(this->_renderFinishedSemaphore);
+        for (size_t i = 0; i < PulsarApp::MAX_FRAMES_IN_FLIGHT; ++i) {
+            this->_device.destroySemaphore(this->_imageAvailableSemaphores[i]);
+            this->_device.destroySemaphore(this->_renderFinishedSemaphores[i]);
+            this->_device.destroyFence(this->_inFlightFences[i]);
+        }
         this->_device.destroyCommandPool(this->_commandPool);
         for (auto& framebuffer : this->_swapChainFramebuffers) {
             this->_device.destroyFramebuffer(framebuffer);
@@ -449,7 +464,7 @@ private:
 
         std::cout << "\t" << (isSuitable ? "[v] " : "[ ] ") << properties.deviceName
                   << " | " << vk::to_string(properties.deviceType) << std::endl;
-        // call for print only
+        // FIXME: call for print only
         checkDeviceExtensionSupport(requiredDeviceExtensions, device, true);
 
         if (isSuitable) {
@@ -1013,12 +1028,26 @@ private:
         }
     }
 
-    void createSemaphores()
+    void createSyncObjects()
     {
-        vk::SemaphoreCreateInfo semaphoreInfo;
+        this->_imageAvailableSemaphores.reserve(PulsarApp::MAX_FRAMES_IN_FLIGHT);
+        this->_renderFinishedSemaphores.reserve(PulsarApp::MAX_FRAMES_IN_FLIGHT);
+        this->_inFlightFences.reserve(PulsarApp::MAX_FRAMES_IN_FLIGHT);
 
-        this->_imageAvailableSemaphore = this->_device.createSemaphore(semaphoreInfo);
-        this->_renderFinishedSemaphore = this->_device.createSemaphore(semaphoreInfo);
+        for (size_t i = 0; i < PulsarApp::MAX_FRAMES_IN_FLIGHT; ++i) {
+            vk::SemaphoreCreateInfo semaphoreInfo;
+
+            this->_imageAvailableSemaphores[i]
+                = this->_device.createSemaphore(semaphoreInfo);
+            this->_renderFinishedSemaphores[i]
+                = this->_device.createSemaphore(semaphoreInfo);
+
+            vk::FenceCreateInfo fenceInfo;
+
+            fenceInfo.setFlags(vk::FenceCreateFlagBits::eSignaled);
+
+            this->_inFlightFences[i] = this->_device.createFence(fenceInfo);
+        }
     }
 };
 
