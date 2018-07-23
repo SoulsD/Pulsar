@@ -18,6 +18,10 @@
 // TODO:
 // - Validation Layers / vk_layer_settings.txt
 // - Create own DispatchLoader ? (vkGetInstanceProcAddr)
+// - recreate a new swap chain while drawing commands on an image from the old swap chain
+//      are still in-flight : pass the previousswap chain to the oldSwapChain field in
+//      swapchainCreateInfoKHR then destroy old swapchain
+//      http://disq.us/p/1iozw03
 
 #define REQUIRED_EXTENTIONS \
     {}
@@ -78,11 +82,11 @@ private:
 
     static constexpr size_t MAX_FRAMES_IN_FLIGHT = 2;
     size_t _currentFrame                         = 0;
+    bool _framebufferResized                     = false;
 
 #ifdef ADD_VALIDATION_LAYERS
     const std::vector<const char*> requiredValidationLayers = VALIDATION_LAYERS;
 #endif
-
 
 public:
     int run()
@@ -110,11 +114,22 @@ private:
         glfwInit();
 
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-        glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+        // glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
         this->_window
             = glfwCreateWindow(WIN_WIDTH, WIN_HEIGHT, "Vulkan", nullptr, nullptr);
+        glfwSetWindowUserPointer(this->_window, this);
+        glfwSetFramebufferSizeCallback(
+            this->_window,
+            [](GLFWwindow* window,
+               int width __attribute__((unused)),
+               int height __attribute__((unused))) {
+                auto app = reinterpret_cast<PulsarApp*>(glfwGetWindowUserPointer(window));
+                app->setFramebufferResized(true);
+            });
     }
+
+    void setFramebufferResized(bool value) { this->_framebufferResized = value; }
 
     void mainLoop()
     {
@@ -133,12 +148,28 @@ private:
                                     std::numeric_limits<uint64_t>::max());
         this->_device.resetFences({ this->_inFlightFences[this->_currentFrame] });
 
-        vk::ResultValue<uint32_t> result = this->_device.acquireNextImageKHR(
-            this->_swapChain,
-            std::numeric_limits<uint64_t>::max(),
-            this->_imageAvailableSemaphores[this->_currentFrame],
-            nullptr);
-        uint32_t imageIndex = result.value;
+        uint32_t imageIndex;
+
+        try {
+            vk::ResultValue<uint32_t> result = this->_device.acquireNextImageKHR(
+                this->_swapChain,
+                std::numeric_limits<uint64_t>::max(),
+                this->_imageAvailableSemaphores[this->_currentFrame],
+                nullptr);
+            imageIndex = result.value;
+            if (result.result != vk::Result::eSuccess) {
+                std::cout << "res : " << result.result << std::endl;
+            }
+            if (result.result == vk::Result::eErrorOutOfDateKHR) {
+                recreateSwapChain();
+                return;
+            }
+        }
+        catch (vk::SystemError const& e) {
+            std::cout << "error : " << e.what() << std::endl;
+            // stop | runtime_error
+            return;
+        }
 
         vk::Semaphore waitSemaphores[]
             = { this->_imageAvailableSemaphores[this->_currentFrame] };
@@ -169,9 +200,23 @@ private:
             .setPImageIndices(&imageIndex)
             .setPResults(nullptr);
 
-        this->_presentQueue.presentKHR(presentInfo);
-        // this->_presentQueue.waitIdle();
+        try {
+            vk::Result result = this->_presentQueue.presentKHR(presentInfo);
 
+            if (result != vk::Result::eSuccess) {
+                std::cout << "res : " << result << std::endl;
+            }
+            if (result == vk::Result::eErrorOutOfDateKHR
+                || result == vk::Result::eSuboptimalKHR || this->_framebufferResized) {
+                this->_framebufferResized = false;
+                recreateSwapChain();
+            }
+        }
+        catch (vk::SystemError const& e) {
+            std::cout << "error : " << e.what() << std::endl;
+            // stop | runtime_error
+        }
+        // this->_presentQueue.waitIdle();
         this->_currentFrame = (this->_currentFrame + 1) % PulsarApp::MAX_FRAMES_IN_FLIGHT;
     }
 
@@ -199,6 +244,32 @@ private:
         createCommandPool();
         createCommandBuffers();
         createSyncObjects();
+    }
+
+    void handleMinimization()
+    {
+        int width = 0, height = 0;
+
+        while (width == 0 || height == 0) {
+            glfwGetFramebufferSize(this->_window, &width, &height);
+            glfwWaitEvents();
+        }
+    }
+
+    void recreateSwapChain()
+    {
+        handleMinimization();
+        std::cout << "Recreating swapchain" << std::endl;
+        this->_device.waitIdle();
+
+        cleanupSwapChain();
+
+        createSwapChain();
+        createImageViews();
+        createRenderPass();
+        createGraphicsPipeline();
+        createFramebuffers();
+        createCommandBuffers();
     }
 
     void createInstance()
@@ -234,22 +305,19 @@ private:
 
     void cleanup()
     {
+        cleanupSwapChain();
+
         for (size_t i = 0; i < PulsarApp::MAX_FRAMES_IN_FLIGHT; ++i) {
             this->_device.destroySemaphore(this->_imageAvailableSemaphores[i]);
             this->_device.destroySemaphore(this->_renderFinishedSemaphores[i]);
             this->_device.destroyFence(this->_inFlightFences[i]);
         }
+        this->_imageAvailableSemaphores.clear();
+        this->_renderFinishedSemaphores.clear();
+        this->_inFlightFences.clear();
+
         this->_device.destroyCommandPool(this->_commandPool);
-        for (auto& framebuffer : this->_swapChainFramebuffers) {
-            this->_device.destroyFramebuffer(framebuffer);
-        }
-        this->_device.destroyPipeline(this->_graphicsPipeline);
-        this->_device.destroyPipelineLayout(this->_pipelineLayout);
-        this->_device.destroyRenderPass(this->_renderPass);
-        for (auto& imageView : this->_swapChainImageViews) {
-            this->_device.destroyImageView(imageView);
-        }
-        this->_device.destroySwapchainKHR(this->_swapChain);
+
         this->_device.destroy();
 #ifdef ADD_VALIDATION_LAYERS
         this->_instance.destroyDebugReportCallbackEXT(
@@ -260,6 +328,27 @@ private:
 
         glfwDestroyWindow(this->_window);
         glfwTerminate();
+    }
+
+    void cleanupSwapChain()
+    {
+        for (auto& framebuffer : this->_swapChainFramebuffers) {
+            this->_device.destroyFramebuffer(framebuffer);
+        }
+        this->_swapChainFramebuffers.clear();
+
+        this->_device.freeCommandBuffers(this->_commandPool, this->_commandBuffers);
+
+        this->_device.destroyPipeline(this->_graphicsPipeline);
+        this->_device.destroyPipelineLayout(this->_pipelineLayout);
+        this->_device.destroyRenderPass(this->_renderPass);
+
+        for (auto& imageView : this->_swapChainImageViews) {
+            this->_device.destroyImageView(imageView);
+        }
+        this->_swapChainImageViews.clear();
+
+        this->_device.destroySwapchainKHR(this->_swapChain);
     }
 
     std::vector<const char*> getRequiredExtensions()
@@ -605,7 +694,13 @@ private:
             return capabilities.currentExtent;
         }
         else {
-            VkExtent2D actualExtent{ WIN_WIDTH, WIN_HEIGHT };
+            VkExtent2D actualExtent;
+            int width, height;
+
+            glfwGetWindowSize(this->_window, &width, &height);
+
+            actualExtent.width  = width > 0 ? static_cast<uint32_t>(width) : WIN_WIDTH;
+            actualExtent.height = height > 0 ? static_cast<uint32_t>(height) : WIN_HEIGHT;
 
             actualExtent.width = std::max(
                 capabilities.minImageExtent.width,
