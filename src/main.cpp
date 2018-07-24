@@ -22,6 +22,7 @@
 //      are still in-flight : pass the previousswap chain to the oldSwapChain field in
 //      swapchainCreateInfoKHR then destroy old swapchain
 //      http://disq.us/p/1iozw03
+// - Custom Allocator
 
 #define REQUIRED_EXTENTIONS \
     {}
@@ -93,6 +94,7 @@ private:
     vk::PhysicalDevice _physicalDevice;
     vk::Device _device;
     vk::Queue _graphicsQueue;
+    vk::Queue _transferQueue;
     vk::Queue _presentQueue;
 
     vk::SurfaceKHR _surface;
@@ -111,6 +113,7 @@ private:
     std::vector<vk::Framebuffer> _swapChainFramebuffers;
 
     vk::CommandPool _commandPool;
+    vk::CommandPool _transferCommandPool;
     std::vector<vk::CommandBuffer> _commandBuffers;
 
     std::vector<vk::Semaphore> _imageAvailableSemaphores;
@@ -281,7 +284,7 @@ private:
         createRenderPass();
         createGraphicsPipeline();
         createFramebuffers();
-        createCommandPool();
+        createCommandPools();
         createVertexBuffer();
         createCommandBuffers();
         createSyncObjects();
@@ -361,6 +364,7 @@ private:
         this->_inFlightFences.clear();
 
         this->_device.destroyCommandPool(this->_commandPool);
+        this->_device.destroyCommandPool(this->_transferCommandPool);
 
         this->_device.destroy();
 #ifdef ADD_VALIDATION_LAYERS
@@ -532,9 +536,13 @@ private:
 
     struct QueueFamilyIndices_t {
         int graphicsFamily = -1;
+        int transferFamily = -1;
         int presentFamily  = -1;
 
-        bool isComplete() { return graphicsFamily >= 0 && presentFamily >= 0; }
+        bool isComplete()
+        {
+            return graphicsFamily >= 0 && transferFamily >= 0 && presentFamily >= 0;
+        }
     };
 
     QueueFamilyIndices_t findQueueFamilies(vk::PhysicalDevice const& device)
@@ -547,13 +555,17 @@ private:
         // TODO: prefer a physical device that supports drawing and presentation in the
         // same queue for improved performance.
         for (auto const& queueFamily : queueFamilies) {
-            if (queueFamily.queueCount > 0
-                && queueFamily.queueFlags & vk::QueueFlagBits::eGraphics) {
-                indices.graphicsFamily = i;
-            }
-            if (queueFamily.queueCount > 0
-                && device.getSurfaceSupportKHR(i, this->_surface)) {
-                indices.presentFamily = i;
+            if (queueFamily.queueCount > 0) {
+                if (queueFamily.queueFlags & vk::QueueFlagBits::eGraphics) {
+                    indices.graphicsFamily = i;
+                }
+                /* else if  | TODO: add fallback : transfert queue to graphics queue */
+                if (queueFamily.queueFlags & vk::QueueFlagBits::eTransfer) {
+                    indices.transferFamily = i;
+                }
+                if (device.getSurfaceSupportKHR(i, this->_surface)) {
+                    indices.presentFamily = i;
+                }
             }
             if (indices.isComplete()) {
                 break;
@@ -647,6 +659,11 @@ private:
         QueueFamilyIndices_t indices = findQueueFamilies(this->_physicalDevice);
         std::set<int> uniqueQueueFamilies
             = { indices.graphicsFamily, indices.presentFamily };
+
+        if (indices.graphicsFamily != indices.transferFamily) {
+            uniqueQueueFamilies.insert(indices.transferFamily);
+        }
+
         std::vector<vk::DeviceQueueCreateInfo> queueCreateInfos;
 
         vk::PhysicalDeviceFeatures features = this->_physicalDevice.getFeatures();
@@ -677,6 +694,9 @@ private:
         this->_device = this->_physicalDevice.createDevice(deviceInfo);
 
         this->_graphicsQueue = this->_device.getQueue(indices.graphicsFamily, 0);
+        this->_transferQueue = (indices.graphicsFamily != indices.transferFamily
+                                    ? this->_device.getQueue(indices.transferFamily, 0)
+                                    : this->_graphicsQueue);
         this->_presentQueue  = this->_device.getQueue(indices.presentFamily, 0);
     }
 
@@ -1124,61 +1144,144 @@ private:
         throw std::runtime_error("no suitable memory type");
     }
 
-    void createVertexBuffer()
+    void copyBuffer(vk::Buffer srcBuffer, vk::Buffer dstBuffer, vk::DeviceSize bufferSize)
     {
-        vk::DeviceSize bufferSize(sizeof(Vertex_t /* vertices[0] */) * vertices.size());
+        vk::CommandBuffer transferCommandBuffer;
+        {
+            vk::CommandBufferAllocateInfo commandBufferInfo;
 
+            commandBufferInfo.setCommandPool(this->_transferCommandPool)
+                .setLevel(vk::CommandBufferLevel::ePrimary)
+                .setCommandBufferCount(1);
+
+            transferCommandBuffer
+                = (this->_device.allocateCommandBuffers(commandBufferInfo)).front();
+        }
+
+        vk::CommandBufferBeginInfo commandBufferBeginInfo;
+
+        commandBufferBeginInfo.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit)
+            .setPInheritanceInfo(nullptr);
+
+        transferCommandBuffer.begin(commandBufferBeginInfo);
+        {
+            vk::BufferCopy copyRegion;
+
+            copyRegion.setSrcOffset(0).setDstOffset(0).setSize(bufferSize);
+            transferCommandBuffer.copyBuffer(srcBuffer, dstBuffer, { copyRegion });
+        }
+        transferCommandBuffer.end();
+
+        vk::SubmitInfo submitInfo;
+
+        submitInfo.setCommandBufferCount(1).setPCommandBuffers(&transferCommandBuffer);
+        this->_transferQueue.submit({ submitInfo }, nullptr);
+        this->_transferQueue.waitIdle();
+
+        this->_device.freeCommandBuffers(this->_transferCommandPool,
+                                         { transferCommandBuffer });
+    }
+
+    void createBuffer(vk::DeviceSize bufferSize,
+                      vk::BufferUsageFlags usageFlags,
+                      vk::MemoryPropertyFlags memoryPropertyFlags,
+                      vk::Buffer& buffer,
+                      vk::DeviceMemory& bufferMemory)
+    {
         {
             vk::BufferCreateInfo bufferInfo;
 
-            bufferInfo.setSize(bufferSize)
-                .setUsage(vk::BufferUsageFlagBits::eVertexBuffer)
-                .setSharingMode(vk::SharingMode::eExclusive);
+            QueueFamilyIndices_t indices = findQueueFamilies(this->_physicalDevice);
+            std::vector<uint32_t> uniqueQueueFamilies
+                = { static_cast<uint32_t>(indices.graphicsFamily) };
 
-            this->_vertexBuffer = this->_device.createBuffer(bufferInfo);
+            if (indices.graphicsFamily != indices.transferFamily) {
+                uniqueQueueFamilies.push_back(
+                    static_cast<uint32_t>(indices.transferFamily));
+                bufferInfo.setSharingMode(vk::SharingMode::eConcurrent);
+            }
+            else {
+                bufferInfo.setSharingMode(vk::SharingMode::eExclusive);
+            }
+
+            bufferInfo.setSize(bufferSize)
+                .setUsage(usageFlags)
+                .setQueueFamilyIndexCount(uniqueQueueFamilies.size())
+                .setPQueueFamilyIndices(uniqueQueueFamilies.data());
+
+            buffer = this->_device.createBuffer(bufferInfo);
         }
 
         {
             vk::MemoryAllocateInfo memoryAllocateInfo;
-
             vk::MemoryRequirements memoryRequirements
-                = this->_device.getBufferMemoryRequirements(this->_vertexBuffer);
-            vk::MemoryPropertyFlags memoryRequiredProperties
-                = vk::MemoryPropertyFlagBits::eHostVisible
-                  | vk::MemoryPropertyFlagBits::eHostCoherent;  // Avoid explicit flushing
-            uint32_t memoryTypeIndex = findMemoryType(memoryRequirements.memoryTypeBits,
-                                                      memoryRequiredProperties);
+                = this->_device.getBufferMemoryRequirements(buffer);
+            uint32_t memoryTypeIndex
+                = findMemoryType(memoryRequirements.memoryTypeBits, memoryPropertyFlags);
 
             memoryAllocateInfo.setAllocationSize(memoryRequirements.size)
                 .setMemoryTypeIndex(memoryTypeIndex);
 
-            this->_vertexBufferMemory = this->_device.allocateMemory(memoryAllocateInfo);
+            bufferMemory = this->_device.allocateMemory(memoryAllocateInfo);
         }
 
-        this->_device.bindBufferMemory(this->_vertexBuffer, this->_vertexBufferMemory, 0);
-
-        {
-            void* data;
-
-            data = this->_device.mapMemory(
-                this->_vertexBufferMemory, 0, bufferSize, vk::MemoryMapFlags());
-            {
-                std::memcpy(data, vertices.data(), bufferSize);
-            }
-            this->_device.unmapMemory(this->_vertexBufferMemory);
-        }
+        this->_device.bindBufferMemory(buffer, bufferMemory, 0);
     }
 
-    void createCommandPool()
+    void createVertexBuffer()
+    {
+        vk::DeviceSize bufferSize = sizeof(Vertex_t) * vertices.size();
+        vk::Buffer stagingBuffer;
+        vk::DeviceMemory stagingBufferMemory;
+
+        createBuffer(
+            bufferSize,
+            vk::BufferUsageFlagBits::eTransferSrc,
+            vk::MemoryPropertyFlagBits::eHostVisible
+                | vk::MemoryPropertyFlagBits::eHostCoherent,  // Avoid explicit flushing
+            stagingBuffer,
+            stagingBufferMemory);
+
+        void* data;
+
+        data = this->_device.mapMemory(
+            stagingBufferMemory, 0, bufferSize, vk::MemoryMapFlags());
+        {
+            std::memcpy(data, vertices.data(), bufferSize);
+        }
+        this->_device.unmapMemory(stagingBufferMemory);
+
+        createBuffer(bufferSize,
+                     vk::BufferUsageFlagBits::eTransferDst
+                         | vk::BufferUsageFlagBits::eVertexBuffer,
+                     vk::MemoryPropertyFlagBits::eDeviceLocal,
+                     this->_vertexBuffer,
+                     this->_vertexBufferMemory);
+
+        copyBuffer(stagingBuffer, this->_vertexBuffer, bufferSize);
+
+        this->_device.destroyBuffer(stagingBuffer);
+        this->_device.freeMemory(stagingBufferMemory);
+    }
+
+    void createCommandPools()
     {
         vk::CommandPoolCreateInfo commandPoolInfo;
         QueueFamilyIndices_t queueFamillyIndices
             = findQueueFamilies(this->_physicalDevice);
 
-        commandPoolInfo.setQueueFamilyIndex(queueFamillyIndices.graphicsFamily)
-            .setFlags(vk::CommandPoolCreateFlags());
+        {
+            commandPoolInfo.setFlags(vk::CommandPoolCreateFlags())
+                .setQueueFamilyIndex(queueFamillyIndices.graphicsFamily);
 
-        this->_commandPool = this->_device.createCommandPool(commandPoolInfo);
+            this->_commandPool = this->_device.createCommandPool(commandPoolInfo);
+        }
+        {
+            commandPoolInfo.setFlags(vk::CommandPoolCreateFlagBits::eTransient)
+                .setQueueFamilyIndex(queueFamillyIndices.transferFamily);
+
+            this->_transferCommandPool = this->_device.createCommandPool(commandPoolInfo);
+        }
     }
 
     void createCommandBuffers()
