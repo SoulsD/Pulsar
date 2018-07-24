@@ -48,6 +48,43 @@
 #define WIN_WIDTH 800
 #define WIN_HEIGHT 450
 
+struct Vertex_t {
+    glm::vec2 position;
+    glm::vec3 color;
+
+    static vk::VertexInputBindingDescription getBindingDescription()
+    {
+        vk::VertexInputBindingDescription bindingDescription;
+
+        bindingDescription.setBinding(0)
+            .setStride(sizeof(Vertex_t))
+            .setInputRate(vk::VertexInputRate::eVertex);
+        return bindingDescription;
+    }
+
+    static std::array<vk::VertexInputAttributeDescription, 2> getAttributeDescriptions()
+    {
+        std::array<vk::VertexInputAttributeDescription, 2> attributeDescriptions;
+
+        attributeDescriptions[0]
+            .setBinding(0)
+            .setLocation(0)
+            .setFormat(vk::Format::eR32G32Sfloat)  // vec2
+            .setOffset(offsetof(Vertex_t, position));
+        attributeDescriptions[1]
+            .setBinding(0)
+            .setLocation(1)
+            .setFormat(vk::Format::eR32G32B32Sfloat)  // vec3
+            .setOffset(offsetof(Vertex_t, color));
+        return attributeDescriptions;
+    }
+};
+
+// interleaving vertex attributes
+const std::vector<Vertex_t> vertices = { { { 0.0f, -0.5f }, { 1.0f, 0.0f, 0.0f } },
+                                         { { 0.5f, 0.5f }, { 0.0f, 1.0f, 0.0f } },
+                                         { { -0.5f, 0.5f }, { 0.0f, 0.0f, 1.0f } } };
+
 class PulsarApp {
 private:
     GLFWwindow* _window;
@@ -903,10 +940,13 @@ private:
         /* -> Vertex input */
         vk::PipelineVertexInputStateCreateInfo vertexInputInfo;
         {
-            vertexInputInfo.setVertexBindingDescriptionCount(0)
-                .setPVertexBindingDescriptions(nullptr)
-                .setVertexAttributeDescriptionCount(0)
-                .setPVertexAttributeDescriptions(nullptr);
+            auto bindingDescription    = Vertex_t::getBindingDescription();
+            auto attributeDescriptions = Vertex_t::getAttributeDescriptions();
+
+            vertexInputInfo.setVertexBindingDescriptionCount(1)
+                .setPVertexBindingDescriptions(&bindingDescription)
+                .setVertexAttributeDescriptionCount(attributeDescriptions.size())
+                .setPVertexAttributeDescriptions(attributeDescriptions.data());
         }
 
         /* -> Input assembly */
