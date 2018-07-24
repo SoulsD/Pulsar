@@ -121,6 +121,9 @@ private:
     size_t _currentFrame                         = 0;
     bool _framebufferResized                     = false;
 
+    vk::Buffer _vertexBuffer;
+    vk::DeviceMemory _vertexBufferMemory;
+
 #ifdef ADD_VALIDATION_LAYERS
     const std::vector<const char*> requiredValidationLayers = VALIDATION_LAYERS;
 #endif
@@ -279,6 +282,7 @@ private:
         createGraphicsPipeline();
         createFramebuffers();
         createCommandPool();
+        createVertexBuffer();
         createCommandBuffers();
         createSyncObjects();
     }
@@ -343,6 +347,9 @@ private:
     void cleanup()
     {
         cleanupSwapChain();
+
+        this->_device.destroyBuffer(this->_vertexBuffer);
+        this->_device.freeMemory(this->_vertexBufferMemory);
 
         for (size_t i = 0; i < PulsarApp::MAX_FRAMES_IN_FLIGHT; ++i) {
             this->_device.destroySemaphore(this->_imageAvailableSemaphores[i]);
@@ -523,16 +530,16 @@ private:
 
     void createSurface() { __win32CreateWindowSurface(); }
 
-    struct QueueFamilyIndices {
+    struct QueueFamilyIndices_t {
         int graphicsFamily = -1;
         int presentFamily  = -1;
 
         bool isComplete() { return graphicsFamily >= 0 && presentFamily >= 0; }
     };
 
-    QueueFamilyIndices findQueueFamilies(vk::PhysicalDevice const& device)
+    QueueFamilyIndices_t findQueueFamilies(vk::PhysicalDevice const& device)
     {
-        QueueFamilyIndices indices;
+        QueueFamilyIndices_t indices;
         std::vector<vk::QueueFamilyProperties> queueFamilies
             = device.getQueueFamilyProperties();
 
@@ -579,7 +586,7 @@ private:
         // auto features   = device.getFeatures();
         bool isSuitable = false;
 
-        QueueFamilyIndices indices = findQueueFamilies(device);
+        QueueFamilyIndices_t indices = findQueueFamilies(device);
 
         if (indices.isComplete() && checkDeviceExtensionSupport(requiredDeviceExtensions, device, false)
             /*properties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu
@@ -594,7 +601,7 @@ private:
         checkDeviceExtensionSupport(requiredDeviceExtensions, device, true);
 
         if (isSuitable) {
-            SwapChainSupportDetails swapChainSupport = querySwapChainSupport(device);
+            SwapChainSupportDetails_t swapChainSupport = querySwapChainSupport(device);
             bool swapChainAdequate(!swapChainSupport.formats.empty()
                                    && !swapChainSupport.presentModes.empty());
             if (!swapChainAdequate) {
@@ -637,7 +644,7 @@ private:
 
     void createLogicalDevice()
     {
-        QueueFamilyIndices indices = findQueueFamilies(this->_physicalDevice);
+        QueueFamilyIndices_t indices = findQueueFamilies(this->_physicalDevice);
         std::set<int> uniqueQueueFamilies
             = { indices.graphicsFamily, indices.presentFamily };
         std::vector<vk::DeviceQueueCreateInfo> queueCreateInfos;
@@ -673,15 +680,15 @@ private:
         this->_presentQueue  = this->_device.getQueue(indices.presentFamily, 0);
     }
 
-    struct SwapChainSupportDetails {
+    struct SwapChainSupportDetails_t {
         vk::SurfaceCapabilitiesKHR capabilities;
         std::vector<vk::SurfaceFormatKHR> formats;
         std::vector<vk::PresentModeKHR> presentModes;
     };
 
-    SwapChainSupportDetails querySwapChainSupport(vk::PhysicalDevice const& device)
+    SwapChainSupportDetails_t querySwapChainSupport(vk::PhysicalDevice const& device)
     {
-        SwapChainSupportDetails details;
+        SwapChainSupportDetails_t details;
 
         details.capabilities = device.getSurfaceCapabilitiesKHR(this->_surface);
         details.formats      = device.getSurfaceFormatsKHR(this->_surface);
@@ -751,7 +758,7 @@ private:
 
     void createSwapChain()
     {
-        SwapChainSupportDetails swapChainSupport
+        SwapChainSupportDetails_t swapChainSupport
             = querySwapChainSupport(this->_physicalDevice);
 
         vk::SurfaceFormatKHR surfaceFormat
@@ -777,7 +784,7 @@ private:
             .setImageArrayLayers(1)
             .setImageUsage(vk::ImageUsageFlagBits::eColorAttachment);
 
-        QueueFamilyIndices indices = findQueueFamilies(this->_physicalDevice);
+        QueueFamilyIndices_t indices = findQueueFamilies(this->_physicalDevice);
         uint32_t queueFamilyIndices[]
             = { (uint32_t) indices.graphicsFamily, (uint32_t) indices.presentFamily };
 
@@ -939,10 +946,9 @@ private:
         /* Fixed functions */
         /* -> Vertex input */
         vk::PipelineVertexInputStateCreateInfo vertexInputInfo;
+        auto bindingDescription    = Vertex_t::getBindingDescription();
+        auto attributeDescriptions = Vertex_t::getAttributeDescriptions();
         {
-            auto bindingDescription    = Vertex_t::getBindingDescription();
-            auto attributeDescriptions = Vertex_t::getAttributeDescriptions();
-
             vertexInputInfo.setVertexBindingDescriptionCount(1)
                 .setPVertexBindingDescriptions(&bindingDescription)
                 .setVertexAttributeDescriptionCount(attributeDescriptions.size())
@@ -958,10 +964,9 @@ private:
 
         /* -> Viewports & scissors */
         vk::PipelineViewportStateCreateInfo viewportStateInfo;
+        vk::Viewport viewport;
+        vk::Rect2D scissor;
         {
-            vk::Viewport viewport;
-            vk::Rect2D scissor;
-
             viewport.setX(0.0f)
                 .setY(0.0f)
                 .setWidth(this->_swapChainExtent.width)
@@ -1011,9 +1016,8 @@ private:
 
         /* -> Color blending */
         vk::PipelineColorBlendStateCreateInfo colorBlendingInfo;
+        vk::PipelineColorBlendAttachmentState colorBlendAttachment;
         {
-            vk::PipelineColorBlendAttachmentState colorBlendAttachment;
-
             colorBlendAttachment
                 .setColorWriteMask(
                     vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG
@@ -1104,10 +1108,72 @@ private:
         }
     }
 
+    uint32_t findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties)
+    {
+        vk::PhysicalDeviceMemoryProperties memoryProperties;
+
+        memoryProperties = this->_physicalDevice.getMemoryProperties();
+
+        for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; ++i) {
+            if (typeFilter & (1 << i)
+                && (memoryProperties.memoryTypes[i].propertyFlags & properties)
+                       == properties) {
+                return i;
+            }
+        }
+        throw std::runtime_error("no suitable memory type");
+    }
+
+    void createVertexBuffer()
+    {
+        vk::DeviceSize bufferSize(sizeof(Vertex_t /* vertices[0] */) * vertices.size());
+
+        {
+            vk::BufferCreateInfo bufferInfo;
+
+            bufferInfo.setSize(bufferSize)
+                .setUsage(vk::BufferUsageFlagBits::eVertexBuffer)
+                .setSharingMode(vk::SharingMode::eExclusive);
+
+            this->_vertexBuffer = this->_device.createBuffer(bufferInfo);
+        }
+
+        {
+            vk::MemoryAllocateInfo memoryAllocateInfo;
+
+            vk::MemoryRequirements memoryRequirements
+                = this->_device.getBufferMemoryRequirements(this->_vertexBuffer);
+            vk::MemoryPropertyFlags memoryRequiredProperties
+                = vk::MemoryPropertyFlagBits::eHostVisible
+                  | vk::MemoryPropertyFlagBits::eHostCoherent;  // Avoid explicit flushing
+            uint32_t memoryTypeIndex = findMemoryType(memoryRequirements.memoryTypeBits,
+                                                      memoryRequiredProperties);
+
+            memoryAllocateInfo.setAllocationSize(memoryRequirements.size)
+                .setMemoryTypeIndex(memoryTypeIndex);
+
+            this->_vertexBufferMemory = this->_device.allocateMemory(memoryAllocateInfo);
+        }
+
+        this->_device.bindBufferMemory(this->_vertexBuffer, this->_vertexBufferMemory, 0);
+
+        {
+            void* data;
+
+            data = this->_device.mapMemory(
+                this->_vertexBufferMemory, 0, bufferSize, vk::MemoryMapFlags());
+            {
+                std::memcpy(data, vertices.data(), bufferSize);
+            }
+            this->_device.unmapMemory(this->_vertexBufferMemory);
+        }
+    }
+
     void createCommandPool()
     {
         vk::CommandPoolCreateInfo commandPoolInfo;
-        QueueFamilyIndices queueFamillyIndices = findQueueFamilies(this->_physicalDevice);
+        QueueFamilyIndices_t queueFamillyIndices
+            = findQueueFamilies(this->_physicalDevice);
 
         commandPoolInfo.setQueueFamilyIndex(queueFamillyIndices.graphicsFamily)
             .setFlags(vk::CommandPoolCreateFlags());
@@ -1153,7 +1219,10 @@ private:
                 {
                     commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics,
                                                this->_graphicsPipeline);
-                    commandBuffer.draw(3, 1, 0, 0);
+
+                    commandBuffer.bindVertexBuffers(0, { this->_vertexBuffer }, { 0 });
+
+                    commandBuffer.draw(vertices.size(), 1, 0, 0);
                 }
                 commandBuffer.endRenderPass();
             }
