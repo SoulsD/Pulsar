@@ -82,9 +82,12 @@ struct Vertex_t {
 };
 
 // interleaving vertex attributes
-const std::vector<Vertex_t> vertices = { { { 0.0f, -0.5f }, { 1.0f, 0.0f, 0.0f } },
-                                         { { 0.5f, 0.5f }, { 0.0f, 1.0f, 0.0f } },
-                                         { { -0.5f, 0.5f }, { 0.0f, 0.0f, 1.0f } } };
+const std::vector<Vertex_t> vertices = { { { -0.5f, -0.5f }, { 1.0f, 0.0f, 0.0f } },
+                                         { { 0.5f, -0.5f }, { 0.0f, 1.0f, 0.0f } },
+                                         { { 0.5f, 0.5f }, { 0.0f, 0.0f, 1.0f } },
+                                         { { -0.5f, 0.5f }, { 1.0f, 1.0f, 1.0f } } };
+
+const std::vector<uint32_t> indices = { 0, 1, 2, 2, 3, 0 };
 
 class PulsarApp {
 private:
@@ -126,6 +129,8 @@ private:
 
     vk::Buffer _vertexBuffer;
     vk::DeviceMemory _vertexBufferMemory;
+    vk::Buffer _indexBuffer;
+    vk::DeviceMemory _indexBufferMemory;
 
 #ifdef ADD_VALIDATION_LAYERS
     const std::vector<const char*> requiredValidationLayers = VALIDATION_LAYERS;
@@ -286,6 +291,7 @@ private:
         createFramebuffers();
         createCommandPools();
         createVertexBuffer();
+        createIndexBuffer();
         createCommandBuffers();
         createSyncObjects();
     }
@@ -353,6 +359,8 @@ private:
 
         this->_device.destroyBuffer(this->_vertexBuffer);
         this->_device.freeMemory(this->_vertexBufferMemory);
+        this->_device.destroyBuffer(this->_indexBuffer);
+        this->_device.freeMemory(this->_indexBufferMemory);
 
         for (size_t i = 0; i < PulsarApp::MAX_FRAMES_IN_FLIGHT; ++i) {
             this->_device.destroySemaphore(this->_imageAvailableSemaphores[i]);
@@ -1264,6 +1272,41 @@ private:
         this->_device.freeMemory(stagingBufferMemory);
     }
 
+    void createIndexBuffer()
+    {
+        vk::DeviceSize bufferSize = sizeof(uint32_t) * indices.size();
+        vk::Buffer stagingBuffer;
+        vk::DeviceMemory stagingBufferMemory;
+
+        createBuffer(bufferSize,
+                     vk::BufferUsageFlagBits::eTransferSrc,
+                     vk::MemoryPropertyFlagBits::eHostVisible
+                         | vk::MemoryPropertyFlagBits::eHostCoherent,
+                     stagingBuffer,
+                     stagingBufferMemory);
+
+        void* data;
+
+        data = this->_device.mapMemory(
+            stagingBufferMemory, 0, bufferSize, vk::MemoryMapFlags());
+        {
+            std::memcpy(data, indices.data(), bufferSize);
+        }
+        this->_device.unmapMemory(stagingBufferMemory);
+
+        createBuffer(
+            bufferSize,
+            vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer,
+            vk::MemoryPropertyFlagBits::eDeviceLocal,
+            this->_indexBuffer,
+            this->_indexBufferMemory);
+
+        copyBuffer(stagingBuffer, this->_indexBuffer, bufferSize);
+
+        this->_device.destroyBuffer(stagingBuffer);
+        this->_device.freeMemory(stagingBufferMemory);
+    }
+
     void createCommandPools()
     {
         vk::CommandPoolCreateInfo commandPoolInfo;
@@ -1324,8 +1367,10 @@ private:
                                                this->_graphicsPipeline);
 
                     commandBuffer.bindVertexBuffers(0, { this->_vertexBuffer }, { 0 });
+                    commandBuffer.bindIndexBuffer(
+                        this->_indexBuffer, 0, vk::IndexType::eUint32);
 
-                    commandBuffer.draw(vertices.size(), 1, 0, 0);
+                    commandBuffer.drawIndexed(indices.size(), 1, 0, 0, 0);
                 }
                 commandBuffer.endRenderPass();
             }
