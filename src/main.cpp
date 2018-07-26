@@ -7,7 +7,11 @@
 
 #include <glfw/glfw3.h>
 #include <glfw/glfw3native.h>  // glfwGetWin32Window
+#define GLM_FORCE_RADIANS
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+
+#include <chrono>
 #include <fstream>
 #include <iostream>
 #include <algorithm>
@@ -48,6 +52,12 @@
 
 #define WIN_WIDTH 800
 #define WIN_HEIGHT 450
+
+struct UniformBufferObject_t {
+    glm::mat4 model;
+    glm::mat4 view;
+    glm::mat4 proj;
+};
 
 struct Vertex_t {
     glm::vec2 position;
@@ -111,6 +121,7 @@ private:
     static constexpr auto fragShaderFile = "build/shaders/default.frag.spv";
 
     vk::RenderPass _renderPass;
+    vk::DescriptorSetLayout _descriptorSetLayout;
     vk::PipelineLayout _pipelineLayout;
     vk::Pipeline _graphicsPipeline;
     std::vector<vk::Framebuffer> _swapChainFramebuffers;
@@ -131,6 +142,9 @@ private:
     vk::DeviceMemory _vertexBufferMemory;
     vk::Buffer _indexBuffer;
     vk::DeviceMemory _indexBufferMemory;
+
+    std::vector<vk::Buffer> _uniformBuffers;
+    std::vector<vk::DeviceMemory> _uniformBuffersMemory;
 
 #ifdef ADD_VALIDATION_LAYERS
     const std::vector<const char*> requiredValidationLayers = VALIDATION_LAYERS;
@@ -268,6 +282,41 @@ private:
         this->_currentFrame = (this->_currentFrame + 1) % PulsarApp::MAX_FRAMES_IN_FLIGHT;
     }
 
+    void updateUniformBuffer(uint32_t currentImage)
+    {
+        static auto startTime = std::chrono::high_resolution_clock::now();
+        auto currentTime      = std::chrono::high_resolution_clock::now();
+
+        float time = std::chrono::duration<float, std::chrono::seconds::period>(
+                         currentTime - startTime)
+                         .count();
+
+        UniformBufferObject_t ubo;
+
+        ubo.model = glm::rotate(
+            glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+        ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f),
+                               glm::vec3(0.0f, 0.0f, 0.0f),
+                               glm::vec3(0.0f, 0.0f, 1.0f));
+        ubo.proj = glm::perspective(
+            glm::radians(45.0f),
+            this->_swapChainExtent.width / (float) this->_swapChainExtent.height,
+            0.1f,
+            10.0f);
+        ubo.proj[1][1] *= -1;
+
+        size_t bufferSize = sizeof(UniformBufferObject_t);
+
+        void* data = this->_device.mapMemory(this->_uniformBuffersMemory[currentImage],
+                                             0,
+                                             bufferSize,
+                                             vk::MemoryMapFlags());
+        {
+            memcpy(data, &ubo, bufferSize);
+        }
+        this->_device.unmapMemory(this->_uniformBuffersMemory[currentImage]);
+    }
+
     void initVulkan()
     {
 #ifdef ADD_VALIDATION_LAYERS
@@ -287,11 +336,13 @@ private:
         createSwapChain();
         createImageViews();
         createRenderPass();
+        createDescriptorSetLayout();
         createGraphicsPipeline();
         createFramebuffers();
         createCommandPools();
         createVertexBuffer();
         createIndexBuffer();
+        createUniformBuffers();
         createCommandBuffers();
         createSyncObjects();
     }
@@ -356,6 +407,17 @@ private:
     void cleanup()
     {
         cleanupSwapChain();
+
+        this->_device.destroyDescriptorSetLayout(this->_descriptorSetLayout);
+
+        for (auto& uniformBuffer : this->_uniformBuffers) {
+            this->_device.destroyBuffer(uniformBuffer);
+        }
+        this->_uniformBuffers.clear();
+        for (auto& uniformBufferMemory : this->_uniformBuffersMemory) {
+            this->_device.freeMemory(uniformBufferMemory);
+        }
+        this->_uniformBuffersMemory.clear();
 
         this->_device.destroyBuffer(this->_vertexBuffer);
         this->_device.freeMemory(this->_vertexBufferMemory);
@@ -912,6 +974,24 @@ private:
         this->_renderPass = this->_device.createRenderPass(renderPassInfo);
     }
 
+    void createDescriptorSetLayout()
+    {
+        vk::DescriptorSetLayoutBinding uboLayoutBinding;
+
+        uboLayoutBinding.setBinding(0)
+            .setDescriptorType(vk::DescriptorType::eUniformBuffer)
+            .setDescriptorCount(1)
+            .setStageFlags(vk::ShaderStageFlagBits::eVertex)
+            .setPImmutableSamplers(nullptr);
+
+        vk::DescriptorSetLayoutCreateInfo descriptorSetLayoutInfo;
+
+        descriptorSetLayoutInfo.setBindingCount(1).setPBindings(&uboLayoutBinding);
+
+        this->_descriptorSetLayout
+            = this->_device.createDescriptorSetLayout(descriptorSetLayoutInfo);
+    }
+
     static std::vector<char> readFile(std::string const& filename)
     {
         std::ifstream file(filename, std::ios::ate | std::ios::binary);
@@ -1079,8 +1159,8 @@ private:
         /* -> Pipeline layout */
         vk::PipelineLayoutCreateInfo pipelineLayoutInfo;
         {
-            pipelineLayoutInfo.setSetLayoutCount(0)
-                .setPSetLayouts(nullptr)
+            pipelineLayoutInfo.setSetLayoutCount(1)
+                .setPSetLayouts(&(this->_descriptorSetLayout))
                 .setPushConstantRangeCount(0)
                 .setPPushConstantRanges(nullptr);
             this->_pipelineLayout
@@ -1305,6 +1385,24 @@ private:
 
         this->_device.destroyBuffer(stagingBuffer);
         this->_device.freeMemory(stagingBufferMemory);
+    }
+
+    void createUniformBuffers()
+    {
+        vk::DeviceSize bufferSize = sizeof(UniformBufferObject_t);
+        size_t numberOfBuffer     = this->_swapChainImages.size();
+
+        this->_uniformBuffers.reserve(numberOfBuffer);
+        this->_uniformBuffersMemory.reserve(numberOfBuffer);
+
+        for (size_t i = 0; i < numberOfBuffer; ++i) {
+            createBuffer(bufferSize,
+                         vk::BufferUsageFlagBits::eUniformBuffer,
+                         vk::MemoryPropertyFlagBits::eHostVisible
+                             | vk::MemoryPropertyFlagBits::eHostCoherent,
+                         this->_uniformBuffers[i],
+                         this->_uniformBuffersMemory[i]);
+        }
     }
 
     void createCommandPools()
