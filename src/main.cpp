@@ -27,6 +27,7 @@
 //      swapchainCreateInfoKHR then destroy old swapchain
 //      http://disq.us/p/1iozw03
 // - Custom Allocator
+// - Multiple descriptor sets (per objects)
 
 #define REQUIRED_EXTENTIONS \
     {}
@@ -145,6 +146,8 @@ private:
 
     std::vector<vk::Buffer> _uniformBuffers;
     std::vector<vk::DeviceMemory> _uniformBuffersMemory;
+    vk::DescriptorPool _descriptorPool;
+    std::vector<vk::DescriptorSet> _descriptorSets;
 
 #ifdef ADD_VALIDATION_LAYERS
     const std::vector<const char*> requiredValidationLayers = VALIDATION_LAYERS;
@@ -232,6 +235,8 @@ private:
             // stop | runtime_error
             return;
         }
+
+        updateUniformBuffer(imageIndex);
 
         vk::Semaphore waitSemaphores[]
             = { this->_imageAvailableSemaphores[this->_currentFrame] };
@@ -343,6 +348,8 @@ private:
         createVertexBuffer();
         createIndexBuffer();
         createUniformBuffers();
+        createDescriptorPool();
+        createDescriptorSets();
         createCommandBuffers();
         createSyncObjects();
     }
@@ -408,6 +415,7 @@ private:
     {
         cleanupSwapChain();
 
+        this->_device.destroyDescriptorPool(this->_descriptorPool);
         this->_device.destroyDescriptorSetLayout(this->_descriptorSetLayout);
 
         for (auto& uniformBuffer : this->_uniformBuffers) {
@@ -670,7 +678,8 @@ private:
 
         QueueFamilyIndices_t indices = findQueueFamilies(device);
 
-        if (indices.isComplete() && checkDeviceExtensionSupport(requiredDeviceExtensions, device, false)
+        if (indices.isComplete()
+            && checkDeviceExtensionSupport(requiredDeviceExtensions, device, false)
             /*properties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu
              && features.geometryShader*/)
         {
@@ -1098,7 +1107,7 @@ private:
                 .setPolygonMode(vk::PolygonMode::eFill)
                 .setLineWidth(1.0f)
                 .setCullMode(vk::CullModeFlagBits::eBack)
-                .setFrontFace(vk::FrontFace::eClockwise)
+                .setFrontFace(vk::FrontFace::eCounterClockwise)
                 .setDepthBiasEnable(VK_FALSE)
                 .setDepthBiasConstantFactor(0.0f)
                 .setDepthBiasClamp(0.0f)
@@ -1390,12 +1399,12 @@ private:
     void createUniformBuffers()
     {
         vk::DeviceSize bufferSize = sizeof(UniformBufferObject_t);
-        size_t numberOfBuffer     = this->_swapChainImages.size();
+        uint32_t numberOfBuffer   = this->_swapChainImages.size();
 
-        this->_uniformBuffers.reserve(numberOfBuffer);
-        this->_uniformBuffersMemory.reserve(numberOfBuffer);
+        this->_uniformBuffers.resize(numberOfBuffer);
+        this->_uniformBuffersMemory.resize(numberOfBuffer);
 
-        for (size_t i = 0; i < numberOfBuffer; ++i) {
+        for (uint32_t i = 0; i < numberOfBuffer; ++i) {
             createBuffer(bufferSize,
                          vk::BufferUsageFlagBits::eUniformBuffer,
                          vk::MemoryPropertyFlagBits::eHostVisible
@@ -1405,19 +1414,76 @@ private:
         }
     }
 
+    void createDescriptorPool()
+    {
+        vk::DescriptorPoolSize descriptorPoolSize;
+        uint32_t descriptorCount = this->_swapChainImages.size();
+
+        descriptorPoolSize.setType(vk::DescriptorType::eUniformBuffer)
+            .setDescriptorCount(descriptorCount);
+
+        vk::DescriptorPoolCreateInfo descriptorPoolInfo;
+
+        descriptorPoolInfo.setPoolSizeCount(1)
+            .setPPoolSizes(&descriptorPoolSize)
+            .setMaxSets(descriptorCount)
+            .setFlags(vk::DescriptorPoolCreateFlags());
+
+        this->_descriptorPool = this->_device.createDescriptorPool(descriptorPoolInfo);
+    }
+
+    void createDescriptorSets()
+    {
+        uint32_t descriptorCount = this->_swapChainImages.size();
+        std::vector<vk::DescriptorSetLayout> descriptorSetLayouts(
+            descriptorCount, this->_descriptorSetLayout);
+
+        vk::DescriptorSetAllocateInfo descriptorSetAllocateInfo;
+
+        descriptorSetAllocateInfo.setDescriptorPool(this->_descriptorPool)
+            .setDescriptorSetCount(descriptorCount)
+            .setPSetLayouts(descriptorSetLayouts.data());
+
+        this->_descriptorSets
+            = this->_device.allocateDescriptorSets(descriptorSetAllocateInfo);
+
+        for (uint32_t i = 0; i < descriptorCount; ++i) {
+            vk::DescriptorBufferInfo descriptorBufferInfo;
+
+            descriptorBufferInfo.setBuffer(this->_uniformBuffers[i])
+                .setOffset(0)
+                .setRange(sizeof(UniformBufferObject_t));
+
+            vk::WriteDescriptorSet descriptorWrite;
+
+            descriptorWrite.setDstSet(this->_descriptorSets[i])
+                .setDstBinding(0)
+                .setDstArrayElement(0)
+                .setDescriptorType(vk::DescriptorType::eUniformBuffer)
+                .setDescriptorCount(1)
+                .setPBufferInfo(&descriptorBufferInfo)
+                .setPImageInfo(nullptr)
+                .setPTexelBufferView(nullptr);
+            this->_device.updateDescriptorSets({ descriptorWrite }, {});
+        }
+    }
+
     void createCommandPools()
     {
-        vk::CommandPoolCreateInfo commandPoolInfo;
         QueueFamilyIndices_t queueFamillyIndices
             = findQueueFamilies(this->_physicalDevice);
 
         {
+            vk::CommandPoolCreateInfo commandPoolInfo;
+
             commandPoolInfo.setFlags(vk::CommandPoolCreateFlags())
                 .setQueueFamilyIndex(queueFamillyIndices.graphicsFamily);
 
             this->_commandPool = this->_device.createCommandPool(commandPoolInfo);
         }
         {
+            vk::CommandPoolCreateInfo commandPoolInfo;
+
             commandPoolInfo.setFlags(vk::CommandPoolCreateFlagBits::eTransient)
                 .setQueueFamilyIndex(queueFamillyIndices.transferFamily);
 
@@ -1467,6 +1533,12 @@ private:
                     commandBuffer.bindVertexBuffers(0, { this->_vertexBuffer }, { 0 });
                     commandBuffer.bindIndexBuffer(
                         this->_indexBuffer, 0, vk::IndexType::eUint32);
+
+                    commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                                                     this->_pipelineLayout,
+                                                     0,
+                                                     { this->_descriptorSets[i] },
+                                                     {});
 
                     commandBuffer.drawIndexed(indices.size(), 1, 0, 0, 0);
                 }
