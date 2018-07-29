@@ -5,7 +5,8 @@
     "files.exclude": {
         "**/*.o": true,
         "**/*.exe": true,
-        "**/*.spv": true
+        "**/*.spv": true,
+        "submodules/**": true
     },
     "editor.tabSize": 4,
     "editor.insertSpaces": true,

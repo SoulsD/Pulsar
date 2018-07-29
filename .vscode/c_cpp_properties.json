@@ -4,7 +4,8 @@
             "name": "Msys64",
             "compilerPath": "C:/msys64/mingw64/bin/gcc",
             "includePath": [
-                "${workspaceFolder}/include"
+                "${workspaceFolder}/include",
+                "${workspaceFolder}/submodules"
             ],
             "defines": [
                 "_DEBUG",

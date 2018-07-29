@@ -11,6 +11,9 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb/stb_image.h>
+
 #include <chrono>
 #include <fstream>
 #include <iostream>
@@ -143,6 +146,9 @@ private:
     vk::DeviceMemory _vertexBufferMemory;
     vk::Buffer _indexBuffer;
     vk::DeviceMemory _indexBufferMemory;
+
+    vk::Image _textureImage;
+    vk::DeviceMemory _textureImageMemory;
 
     std::vector<vk::Buffer> _uniformBuffers;
     std::vector<vk::DeviceMemory> _uniformBuffersMemory;
@@ -345,6 +351,7 @@ private:
         createGraphicsPipeline();
         createFramebuffers();
         createCommandPools();
+        createTextureImage();
         createVertexBuffer();
         createIndexBuffer();
         createUniformBuffers();
@@ -414,6 +421,9 @@ private:
     void cleanup()
     {
         cleanupSwapChain();
+
+        this->_device.destroyImage(this->_textureImage);
+        this->_device.freeMemory(this->_textureImageMemory);
 
         this->_device.destroyDescriptorPool(this->_descriptorPool);
         this->_device.destroyDescriptorSetLayout(this->_descriptorSetLayout);
@@ -1225,6 +1235,222 @@ private:
         }
     }
 
+    vk::CommandBuffer beginSingleTimeCommand(vk::CommandPool& commandPool)
+    {
+        vk::CommandBuffer commandBuffer;
+        {
+            vk::CommandBufferAllocateInfo commandBufferInfo;
+
+            commandBufferInfo.setCommandPool(commandPool)
+                .setLevel(vk::CommandBufferLevel::ePrimary)
+                .setCommandBufferCount(1);
+
+            commandBuffer
+                = (this->_device.allocateCommandBuffers(commandBufferInfo)).front();
+        }
+
+        vk::CommandBufferBeginInfo commandBufferBeginInfo;
+
+        commandBufferBeginInfo.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit)
+            .setPInheritanceInfo(nullptr);
+
+        commandBuffer.begin(commandBufferBeginInfo);
+        return commandBuffer;
+    }
+
+    void endSingleTimeCommand(vk::CommandBuffer& commandBuffer,
+                              vk::CommandPool& commandPool,
+                              vk::Queue& queue)
+    {
+        commandBuffer.end();
+
+        vk::SubmitInfo submitInfo;
+
+        submitInfo.setCommandBufferCount(1).setPCommandBuffers(&commandBuffer);
+        queue.submit({ submitInfo }, nullptr);
+        queue.waitIdle();
+
+        this->_device.freeCommandBuffers(commandPool, { commandBuffer });
+    }
+
+    void createImage(uint32_t width,
+                     uint32_t height,
+                     vk::Format format,
+                     vk::ImageTiling tiling,
+                     vk::ImageUsageFlags usageFlags,
+                     vk::MemoryPropertyFlags memoryPropertyFlags,
+                     vk::Image& image,
+                     vk::DeviceMemory& imageMemory)
+    {
+        {
+            vk::ImageCreateInfo imageInfo;
+
+            imageInfo.setImageType(vk::ImageType::e2D)
+                .setExtent(vk::Extent3D(width, height, 1))
+                .setMipLevels(1)
+                .setArrayLayers(1)
+                .setFormat(format)
+                .setTiling(tiling)
+                .setInitialLayout(vk::ImageLayout::eUndefined)
+                .setUsage(usageFlags)
+                .setSharingMode(vk::SharingMode::eExclusive)  // FIXME: ?
+                .setSamples(vk::SampleCountFlagBits::e1)
+                .setFlags(vk::ImageCreateFlags());
+
+            image = this->_device.createImage(imageInfo);
+        }
+        {
+            vk::MemoryAllocateInfo memoryAllocateInfo;
+            vk::MemoryRequirements memoryRequirements
+                = this->_device.getImageMemoryRequirements(image);
+            uint32_t memoryTypeIndex
+                = findMemoryType(memoryRequirements.memoryTypeBits, memoryPropertyFlags);
+
+            memoryAllocateInfo.setAllocationSize(memoryRequirements.size)
+                .setMemoryTypeIndex(memoryTypeIndex);
+
+            imageMemory = this->_device.allocateMemory(memoryAllocateInfo);
+        }
+
+        this->_device.bindImageMemory(image, imageMemory, 0);
+    }
+
+    void transitionImageLayout(vk::Image& image,
+                               vk::Format format,
+                               vk::ImageLayout oldLayout,
+                               vk::ImageLayout newLayout)
+    {
+        vk::CommandBuffer commandBuffer = beginSingleTimeCommand(this->_commandPool);
+        {
+            vk::ImageMemoryBarrier imageMemoryBarrier;
+            vk::PipelineStageFlags sourceStage;
+            vk::PipelineStageFlags destinationStage;
+
+            imageMemoryBarrier.setOldLayout(oldLayout)
+                .setNewLayout(newLayout)
+                .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+                .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+                .setImage(image)
+                .setSubresourceRange(vk::ImageSubresourceRange()
+                                         .setAspectMask(vk::ImageAspectFlagBits::eColor)
+                                         .setBaseMipLevel(0)
+                                         .setLevelCount(1)
+                                         .setBaseArrayLayer(0)
+                                         .setLayerCount(1));
+
+            if (oldLayout == vk::ImageLayout::eUndefined
+                && newLayout == vk::ImageLayout::eTransferDstOptimal) {
+                imageMemoryBarrier.setSrcAccessMask(vk::AccessFlags())
+                    .setDstAccessMask(vk::AccessFlagBits::eTransferWrite);
+
+                sourceStage      = vk::PipelineStageFlagBits::eTopOfPipe;
+                destinationStage = vk::PipelineStageFlagBits::eTransfer;
+            }
+            else if (oldLayout == vk::ImageLayout::eTransferDstOptimal
+                     && newLayout == vk::ImageLayout::eShaderReadOnlyOptimal) {
+                imageMemoryBarrier.setSrcAccessMask(vk::AccessFlagBits::eTransferWrite)
+                    .setDstAccessMask(vk::AccessFlagBits::eShaderRead);
+
+                sourceStage      = vk::PipelineStageFlagBits::eTransfer;
+                destinationStage = vk::PipelineStageFlagBits::eFragmentShader;
+            }
+            else {
+                throw std::runtime_error("unsuported layout transition");
+            }
+
+            commandBuffer.pipelineBarrier(sourceStage,
+                                          destinationStage,
+                                          vk::DependencyFlags(),
+                                          {},
+                                          {},
+                                          { imageMemoryBarrier });
+        }
+        endSingleTimeCommand(commandBuffer, this->_commandPool, this->_graphicsQueue);
+    }
+
+    void copyBufferToImage(vk::Buffer& buffer,
+                           vk::Image& image,
+                           uint32_t width,
+                           uint32_t height)
+    {
+        vk::CommandBuffer commandBuffer = beginSingleTimeCommand(this->_commandPool);
+        {
+            vk::BufferImageCopy region;
+
+            region.setBufferOffset(0)
+                .setBufferRowLength(0)
+                .setBufferImageHeight(0)
+                .setImageSubresource(vk::ImageSubresourceLayers()
+                                         .setAspectMask(vk::ImageAspectFlagBits::eColor)
+                                         .setMipLevel(0)
+                                         .setBaseArrayLayer(0)
+                                         .setLayerCount(1))
+                .setImageOffset(vk::Offset3D(0, 0, 0))
+                .setImageExtent(vk::Extent3D(width, height, 1));
+
+            commandBuffer.copyBufferToImage(
+                buffer, image, vk::ImageLayout::eTransferDstOptimal, { region });
+        }
+        endSingleTimeCommand(commandBuffer, this->_commandPool, this->_graphicsQueue);
+    }
+
+    void createTextureImage()
+    {
+        int texWidth, texHeight, texChannels;
+        stbi_uc* imageData = stbi_load("res/textures/default.png",
+                                       &texWidth,
+                                       &texHeight,
+                                       &texChannels,
+                                       STBI_rgb_alpha);
+
+        vk::DeviceSize imageSize = texWidth * texHeight * 4;
+
+        if (!imageData) {
+            throw std::runtime_error("failed to load texture image");
+        }
+
+        vk::Buffer stagingBuffer;
+        vk::DeviceMemory stagingBufferMemory;
+
+        createBuffer(imageSize,
+                     vk::BufferUsageFlagBits::eTransferSrc,
+                     vk::MemoryPropertyFlagBits::eHostVisible
+                         | vk::MemoryPropertyFlagBits::eHostCoherent,
+                     stagingBuffer,
+                     stagingBufferMemory);
+
+        void* data = this->_device.mapMemory(
+            stagingBufferMemory, 0, imageSize, vk::MemoryMapFlags());
+        {
+            std::memcpy(data, imageData, imageSize);
+        }
+        this->_device.unmapMemory(stagingBufferMemory);
+
+        stbi_image_free(imageData);
+
+        createImage(
+            texWidth,
+            texHeight,
+            vk::Format::eR8G8B8A8Unorm,
+            vk::ImageTiling::eOptimal,
+            vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
+            vk::MemoryPropertyFlagBits::eDeviceLocal,
+            this->_textureImage,
+            this->_textureImageMemory);
+
+        transitionImageLayout(this->_textureImage,
+                              vk::Format::eR8G8B8A8Unorm,
+                              vk::ImageLayout::eUndefined,
+                              vk::ImageLayout::eTransferDstOptimal);
+        copyBufferToImage(stagingBuffer, this->_textureImage, texWidth, texHeight);
+        transitionImageLayout(this->_textureImage,
+                              vk::Format::eR8G8B8A8Unorm,
+                              vk::ImageLayout::eTransferDstOptimal,
+                              vk::ImageLayout::eShaderReadOnlyOptimal);
+        this->_device.destroyBuffer(stagingBuffer);
+        this->_device.freeMemory(stagingBufferMemory);
+    }
+
     uint32_t findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties)
     {
         vk::PhysicalDeviceMemoryProperties memoryProperties;
@@ -1243,40 +1469,16 @@ private:
 
     void copyBuffer(vk::Buffer srcBuffer, vk::Buffer dstBuffer, vk::DeviceSize bufferSize)
     {
-        vk::CommandBuffer transferCommandBuffer;
-        {
-            vk::CommandBufferAllocateInfo commandBufferInfo;
-
-            commandBufferInfo.setCommandPool(this->_transferCommandPool)
-                .setLevel(vk::CommandBufferLevel::ePrimary)
-                .setCommandBufferCount(1);
-
-            transferCommandBuffer
-                = (this->_device.allocateCommandBuffers(commandBufferInfo)).front();
-        }
-
-        vk::CommandBufferBeginInfo commandBufferBeginInfo;
-
-        commandBufferBeginInfo.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit)
-            .setPInheritanceInfo(nullptr);
-
-        transferCommandBuffer.begin(commandBufferBeginInfo);
+        vk::CommandBuffer transferCommandBuffer
+            = beginSingleTimeCommand(this->_transferCommandPool);
         {
             vk::BufferCopy copyRegion;
 
             copyRegion.setSrcOffset(0).setDstOffset(0).setSize(bufferSize);
             transferCommandBuffer.copyBuffer(srcBuffer, dstBuffer, { copyRegion });
         }
-        transferCommandBuffer.end();
-
-        vk::SubmitInfo submitInfo;
-
-        submitInfo.setCommandBufferCount(1).setPCommandBuffers(&transferCommandBuffer);
-        this->_transferQueue.submit({ submitInfo }, nullptr);
-        this->_transferQueue.waitIdle();
-
-        this->_device.freeCommandBuffers(this->_transferCommandPool,
-                                         { transferCommandBuffer });
+        endSingleTimeCommand(
+            transferCommandBuffer, this->_transferCommandPool, this->_transferQueue);
     }
 
     void createBuffer(vk::DeviceSize bufferSize,

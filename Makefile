@@ -4,6 +4,7 @@ TEST_NAME	= run_unittest
 BUILDDIR	= build/
 SRCDIR		= src/
 INCDIR		= include/
+SUBMODSDIR 	= submodules/
 TESTDIR		= test/
 SHADERSDIR	= shaders/
 SPVDIR		= $(BUILDDIR)$(SHADERSDIR)
@@ -16,7 +17,8 @@ OBJS		= $(PULSAR_OBJS)
 TEST_SRC	= $(TESTDIR)headers/ColorUnittest.cpp
 TEST_OBJS	= $(TEST_SRC:.cpp=.o)
 
-PULSAR_INC	= -I $(INCDIR)
+PULSAR_INC	= -I $(INCDIR) \
+				-I $(SUBMODSDIR)
 
 SHADERS		= $(SHADERSDIR)default.vert \
 				$(SHADERSDIR)default.frag
