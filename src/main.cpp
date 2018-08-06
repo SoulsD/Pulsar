@@ -149,6 +149,8 @@ private:
 
     vk::Image _textureImage;
     vk::DeviceMemory _textureImageMemory;
+    vk::ImageView _textureImageView;
+    vk::Sampler _textureSampler;
 
     std::vector<vk::Buffer> _uniformBuffers;
     std::vector<vk::DeviceMemory> _uniformBuffersMemory;
@@ -352,6 +354,8 @@ private:
         createFramebuffers();
         createCommandPools();
         createTextureImage();
+        createTextureImageView();
+        createTextureSampler();
         createVertexBuffer();
         createIndexBuffer();
         createUniformBuffers();
@@ -422,6 +426,8 @@ private:
     {
         cleanupSwapChain();
 
+        this->_device.destroySampler(this->_textureSampler);
+        this->_device.destroyImageView(this->_textureImageView);
         this->_device.destroyImage(this->_textureImage);
         this->_device.freeMemory(this->_textureImageMemory);
 
@@ -683,16 +689,14 @@ private:
         std::vector<const char*> requiredDeviceExtensions(DEVICE_REQUIRED_EXTENSIONS);
 
         auto properties = device.getProperties();
-        // auto features   = device.getFeatures();
+        auto features   = device.getFeatures();
         bool isSuitable = false;
 
         QueueFamilyIndices_t indices = findQueueFamilies(device);
 
         if (indices.isComplete()
             && checkDeviceExtensionSupport(requiredDeviceExtensions, device, false)
-            /*properties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu
-             && features.geometryShader*/)
-        {
+            && features.samplerAnisotropy /* TODO: Do not use if not available */) {
             isSuitable = true;
         }
 
@@ -920,26 +924,31 @@ private:
         this->_swapChainExtent = extent;
     }
 
+    vk::ImageView createImageView(vk::Image const& image, vk::Format format)
+    {
+        vk::ImageViewCreateInfo imageViewInfo;
+
+        imageViewInfo.setImage(image)
+            .setViewType(vk::ImageViewType::e2D)
+            .setFormat(format)
+            .setComponents(vk::ComponentMapping())
+            .setSubresourceRange(vk::ImageSubresourceRange()
+                                     .setAspectMask(vk::ImageAspectFlagBits::eColor)
+                                     .setBaseMipLevel(0)
+                                     .setLevelCount(1)
+                                     .setBaseArrayLayer(0)
+                                     .setLayerCount(1));
+
+        return this->_device.createImageView(imageViewInfo);
+    }
+
     void createImageViews()
     {
         this->_swapChainImageViews.reserve(this->_swapChainImages.size());
 
         for (vk::Image const& image : this->_swapChainImages) {
-            vk::ImageViewCreateInfo imageViewInfo;
-
-            imageViewInfo.setImage(image)
-                .setViewType(vk::ImageViewType::e2D)
-                .setFormat(this->_swapChainFormat)
-                .setComponents(vk::ComponentMapping())
-                .setSubresourceRange(vk::ImageSubresourceRange()
-                                         .setAspectMask(vk::ImageAspectFlagBits::eColor)
-                                         .setBaseMipLevel(0)
-                                         .setLevelCount(1)
-                                         .setBaseArrayLayer(0)
-                                         .setLayerCount(1));
-
             this->_swapChainImageViews.push_back(
-                this->_device.createImageView(imageViewInfo));
+                createImageView(image, this->_swapChainFormat));
         }
     }
 
@@ -1449,6 +1458,35 @@ private:
                               vk::ImageLayout::eShaderReadOnlyOptimal);
         this->_device.destroyBuffer(stagingBuffer);
         this->_device.freeMemory(stagingBufferMemory);
+    }
+
+    void createTextureImageView()
+    {
+        this->_textureImageView
+            = createImageView(this->_textureImage, vk::Format::eR8G8B8A8Unorm);
+    }
+
+    void createTextureSampler()
+    {
+        vk::SamplerCreateInfo samplerInfo;
+
+        samplerInfo.setMagFilter(vk::Filter::eLinear)
+            .setMinFilter(vk::Filter::eLinear)
+            .setAddressModeU(vk::SamplerAddressMode::eRepeat)
+            .setAddressModeV(vk::SamplerAddressMode::eRepeat)
+            .setAddressModeW(vk::SamplerAddressMode::eRepeat)
+            .setAnisotropyEnable(VK_TRUE)
+            .setMaxAnisotropy(16)
+            .setBorderColor(vk::BorderColor::eIntOpaqueBlack)
+            .setUnnormalizedCoordinates(VK_FALSE)
+            .setCompareEnable(VK_FALSE)
+            .setCompareOp(vk::CompareOp::eAlways)
+            .setMipmapMode(vk::SamplerMipmapMode::eLinear)
+            .setMipLodBias(0.0f)
+            .setMinLod(0.0f)
+            .setMaxLod(0.0f);
+
+        this->_textureSampler = this->_device.createSampler(samplerInfo);
     }
 
     uint32_t findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties)
