@@ -66,6 +66,7 @@ struct UniformBufferObject_t {
 struct Vertex_t {
     glm::vec2 position;
     glm::vec3 color;
+    glm::vec2 texCoord;
 
     static vk::VertexInputBindingDescription getBindingDescription()
     {
@@ -77,9 +78,9 @@ struct Vertex_t {
         return bindingDescription;
     }
 
-    static std::array<vk::VertexInputAttributeDescription, 2> getAttributeDescriptions()
+    static std::array<vk::VertexInputAttributeDescription, 3> getAttributeDescriptions()
     {
-        std::array<vk::VertexInputAttributeDescription, 2> attributeDescriptions;
+        std::array<vk::VertexInputAttributeDescription, 3> attributeDescriptions;
 
         attributeDescriptions[0]
             .setBinding(0)
@@ -91,15 +92,21 @@ struct Vertex_t {
             .setLocation(1)
             .setFormat(vk::Format::eR32G32B32Sfloat)  // vec3
             .setOffset(offsetof(Vertex_t, color));
+        attributeDescriptions[2]
+            .setBinding(0)
+            .setLocation(2)
+            .setFormat(vk::Format::eR32G32Sfloat)  // vec2
+            .setOffset(offsetof(Vertex_t, texCoord));
         return attributeDescriptions;
     }
 };
 
 // interleaving vertex attributes
-const std::vector<Vertex_t> vertices = { { { -0.5f, -0.5f }, { 1.0f, 0.0f, 0.0f } },
-                                         { { 0.5f, -0.5f }, { 0.0f, 1.0f, 0.0f } },
-                                         { { 0.5f, 0.5f }, { 0.0f, 0.0f, 1.0f } },
-                                         { { -0.5f, 0.5f }, { 1.0f, 1.0f, 1.0f } } };
+const std::vector<Vertex_t> vertices
+    = { { { -0.5f, -0.5f }, { 1.0f, 0.0f, 0.0f }, { 1.0f, 0.0f } },
+        { { 0.5f, -0.5f }, { 0.0f, 1.0f, 0.0f }, { 0.0f, 0.0f } },
+        { { 0.5f, 0.5f }, { 0.0f, 0.0f, 1.0f }, { 0.0f, 1.0f } },
+        { { -0.5f, 0.5f }, { 1.0f, 1.0f, 1.0f }, { 1.0f, 1.0f } } };
 
 const std::vector<uint32_t> indices = { 0, 1, 2, 2, 3, 0 };
 
@@ -1005,16 +1012,30 @@ private:
     void createDescriptorSetLayout()
     {
         vk::DescriptorSetLayoutBinding uboLayoutBinding;
+        {
+            uboLayoutBinding.setBinding(0)
+                .setDescriptorType(vk::DescriptorType::eUniformBuffer)
+                .setDescriptorCount(1)
+                .setStageFlags(vk::ShaderStageFlagBits::eVertex)
+                .setPImmutableSamplers(nullptr);
+        }
 
-        uboLayoutBinding.setBinding(0)
-            .setDescriptorType(vk::DescriptorType::eUniformBuffer)
-            .setDescriptorCount(1)
-            .setStageFlags(vk::ShaderStageFlagBits::eVertex)
-            .setPImmutableSamplers(nullptr);
+        vk::DescriptorSetLayoutBinding samplerLayoutBinding;
+        {
+            samplerLayoutBinding.setBinding(1)
+                .setDescriptorType(vk::DescriptorType::eCombinedImageSampler)
+                .setDescriptorCount(1)
+                .setStageFlags(vk::ShaderStageFlagBits::eFragment)
+                .setPImmutableSamplers(nullptr);
+        }
 
         vk::DescriptorSetLayoutCreateInfo descriptorSetLayoutInfo;
+        std::vector<vk::DescriptorSetLayoutBinding> bindings
+            = { uboLayoutBinding, samplerLayoutBinding };
 
-        descriptorSetLayoutInfo.setBindingCount(1).setPBindings(&uboLayoutBinding);
+
+        descriptorSetLayoutInfo.setBindingCount(bindings.size())
+            .setPBindings(bindings.data());
 
         this->_descriptorSetLayout
             = this->_device.createDescriptorSetLayout(descriptorSetLayoutInfo);
@@ -1656,16 +1677,21 @@ private:
 
     void createDescriptorPool()
     {
-        vk::DescriptorPoolSize descriptorPoolSize;
+        std::array<vk::DescriptorPoolSize, 2> descriptorPoolSizes;
         uint32_t descriptorCount = this->_swapChainImages.size();
 
-        descriptorPoolSize.setType(vk::DescriptorType::eUniformBuffer)
+        descriptorPoolSizes[0]
+            .setType(vk::DescriptorType::eUniformBuffer)
+            .setDescriptorCount(descriptorCount);
+
+        descriptorPoolSizes[1]
+            .setType(vk::DescriptorType::eCombinedImageSampler)
             .setDescriptorCount(descriptorCount);
 
         vk::DescriptorPoolCreateInfo descriptorPoolInfo;
 
-        descriptorPoolInfo.setPoolSizeCount(1)
-            .setPPoolSizes(&descriptorPoolSize)
+        descriptorPoolInfo.setPoolSizeCount(descriptorPoolSizes.size())
+            .setPPoolSizes(descriptorPoolSizes.data())
             .setMaxSets(descriptorCount)
             .setFlags(vk::DescriptorPoolCreateFlags());
 
@@ -1688,23 +1714,44 @@ private:
             = this->_device.allocateDescriptorSets(descriptorSetAllocateInfo);
 
         for (uint32_t i = 0; i < descriptorCount; ++i) {
+            std::array<vk::WriteDescriptorSet, 2> descriptorWrites;
+
             vk::DescriptorBufferInfo descriptorBufferInfo;
+            {
+                descriptorBufferInfo.setBuffer(this->_uniformBuffers[i])
+                    .setOffset(0)
+                    .setRange(sizeof(UniformBufferObject_t));
 
-            descriptorBufferInfo.setBuffer(this->_uniformBuffers[i])
-                .setOffset(0)
-                .setRange(sizeof(UniformBufferObject_t));
+                descriptorWrites[0]
+                    .setDstSet(this->_descriptorSets[i])
+                    .setDstBinding(0)
+                    .setDstArrayElement(0)
+                    .setDescriptorType(vk::DescriptorType::eUniformBuffer)
+                    .setDescriptorCount(1)
+                    .setPBufferInfo(&descriptorBufferInfo)
+                    .setPImageInfo(nullptr)
+                    .setPTexelBufferView(nullptr);
+            }
 
-            vk::WriteDescriptorSet descriptorWrite;
+            vk::DescriptorImageInfo descriptorImageInfo;
+            {
+                descriptorImageInfo
+                    .setImageLayout(vk::ImageLayout::eShaderReadOnlyOptimal)
+                    .setImageView(this->_textureImageView)
+                    .setSampler(this->_textureSampler);
 
-            descriptorWrite.setDstSet(this->_descriptorSets[i])
-                .setDstBinding(0)
-                .setDstArrayElement(0)
-                .setDescriptorType(vk::DescriptorType::eUniformBuffer)
-                .setDescriptorCount(1)
-                .setPBufferInfo(&descriptorBufferInfo)
-                .setPImageInfo(nullptr)
-                .setPTexelBufferView(nullptr);
-            this->_device.updateDescriptorSets({ descriptorWrite }, {});
+                descriptorWrites[1]
+                    .setDstSet(this->_descriptorSets[i])
+                    .setDstBinding(1)
+                    .setDstArrayElement(0)
+                    .setDescriptorType(vk::DescriptorType::eCombinedImageSampler)
+                    .setDescriptorCount(1)
+                    .setPBufferInfo(nullptr)
+                    .setPImageInfo(&descriptorImageInfo)
+                    .setPTexelBufferView(nullptr);
+            }
+
+            this->_device.updateDescriptorSets(descriptorWrites, {});
         }
     }
 
