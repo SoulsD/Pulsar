@@ -167,13 +167,13 @@ private:
     vk::Sampler _textureSampler;
 
     std::vector<vk::Buffer> _uniformBuffers;
-    std::vector<vk::DeviceMemory> _uniformBuffersMemory;
+    std::vector<vk::DeviceMemory> _uniformBufferMemories;
     vk::DescriptorPool _descriptorPool;
     std::vector<vk::DescriptorSet> _descriptorSets;
 
-    vk::Image _depthImage;
-    vk::DeviceMemory _depthImageMemory;
-    vk::ImageView _depthImageView;
+    std::vector<vk::Image> _depthImages;
+    std::vector<vk::DeviceMemory> _depthImageMemories;
+    std::vector<vk::ImageView> _depthImageViews;
 
 #ifdef ADD_VALIDATION_LAYERS
     const std::vector<const char*> requiredValidationLayers = VALIDATION_LAYERS;
@@ -338,14 +338,14 @@ private:
 
         size_t bufferSize = sizeof(UniformBufferObject_t);
 
-        void* data = this->_device.mapMemory(this->_uniformBuffersMemory[currentImage],
+        void* data = this->_device.mapMemory(this->_uniformBufferMemories[currentImage],
                                              0,
                                              bufferSize,
                                              vk::MemoryMapFlags());
         {
             memcpy(data, &ubo, bufferSize);
         }
-        this->_device.unmapMemory(this->_uniformBuffersMemory[currentImage]);
+        this->_device.unmapMemory(this->_uniformBufferMemories[currentImage]);
     }
 
     void initVulkan()
@@ -458,10 +458,10 @@ private:
             this->_device.destroyBuffer(uniformBuffer);
         }
         this->_uniformBuffers.clear();
-        for (auto& uniformBufferMemory : this->_uniformBuffersMemory) {
+        for (auto& uniformBufferMemory : this->_uniformBufferMemories) {
             this->_device.freeMemory(uniformBufferMemory);
         }
-        this->_uniformBuffersMemory.clear();
+        this->_uniformBufferMemories.clear();
 
         this->_device.destroyBuffer(this->_vertexBuffer);
         this->_device.freeMemory(this->_vertexBufferMemory);
@@ -494,9 +494,18 @@ private:
 
     void cleanupSwapChain()
     {
-        this->_device.destroyImageView(this->_depthImageView);
-        this->_device.destroyImage(this->_depthImage);
-        this->_device.freeMemory(this->_depthImageMemory);
+        for (auto& imageView : this->_depthImageViews) {
+            this->_device.destroyImageView(imageView);
+        }
+        this->_depthImageViews.clear();
+        for (auto& image : this->_depthImages) {
+            this->_device.destroyImage(image);
+        }
+        this->_depthImages.clear();
+        for (auto& imageMemory : this->_depthImageMemories) {
+            this->_device.freeMemory(imageMemory);
+        }
+        this->_depthImageMemories.clear();
 
         for (auto& framebuffer : this->_swapChainFramebuffers) {
             this->_device.destroyFramebuffer(framebuffer);
@@ -1297,12 +1306,14 @@ private:
 
     void createFramebuffers()
     {
-        this->_swapChainFramebuffers.reserve(this->_swapChainImageViews.size());
+        uint32_t numberOfBuffer = this->_swapChainImageViews.size();
 
-        for (vk::ImageView const& imageView : this->_swapChainImageViews) {
+        this->_swapChainFramebuffers.reserve(numberOfBuffer);
+
+        for (uint32_t i = 0; i < numberOfBuffer; ++i) {
             vk::FramebufferCreateInfo framebufferInfo;
             std::array<vk::ImageView, 2> attachments
-                = { imageView, this->_depthImageView };
+                = { this->_swapChainImageViews[i], this->_depthImageViews[i] };
 
             framebufferInfo.setRenderPass(this->_renderPass)
                 .setAttachmentCount(attachments.size())
@@ -1734,7 +1745,7 @@ private:
         uint32_t numberOfBuffer   = this->_swapChainImages.size();
 
         this->_uniformBuffers.resize(numberOfBuffer);
-        this->_uniformBuffersMemory.resize(numberOfBuffer);
+        this->_uniformBufferMemories.resize(numberOfBuffer);
 
         for (uint32_t i = 0; i < numberOfBuffer; ++i) {
             createBuffer(bufferSize,
@@ -1742,7 +1753,7 @@ private:
                          vk::MemoryPropertyFlagBits::eHostVisible
                              | vk::MemoryPropertyFlagBits::eHostCoherent,
                          this->_uniformBuffers[i],
-                         this->_uniformBuffersMemory[i]);
+                         this->_uniformBufferMemories[i]);
         }
     }
 
@@ -1968,22 +1979,31 @@ private:
 
     void createDepthResources()
     {
-        vk::Format depthFormat = findDepthFormat();
+        uint32_t numberOfBuffer = this->_swapChainImageViews.size();
+        vk::Format depthFormat  = findDepthFormat();
 
-        createImage(this->_swapChainExtent.width,
-                    this->_swapChainExtent.height,
-                    depthFormat,
-                    vk::ImageTiling::eOptimal,
-                    vk::ImageUsageFlagBits::eDepthStencilAttachment,
-                    vk::MemoryPropertyFlagBits::eDeviceLocal,
-                    this->_depthImage,
-                    this->_depthImageMemory);
-        this->_depthImageView = createImageView(
-            this->_depthImage, depthFormat, vk::ImageAspectFlagBits::eDepth);
-        transitionImageLayout(this->_depthImage,
-                              depthFormat,
-                              vk::ImageLayout::eUndefined,
-                              vk::ImageLayout::eDepthStencilAttachmentOptimal);
+        this->_depthImages.resize(numberOfBuffer);
+        this->_depthImageMemories.resize(numberOfBuffer);
+        this->_depthImageViews.resize(numberOfBuffer);
+
+        for (uint32_t i = 0; i < numberOfBuffer; ++i) {
+            createImage(this->_swapChainExtent.width,
+                        this->_swapChainExtent.height,
+                        depthFormat,
+                        vk::ImageTiling::eOptimal,
+                        vk::ImageUsageFlagBits::eDepthStencilAttachment,
+                        vk::MemoryPropertyFlagBits::eDeviceLocal,
+                        this->_depthImages[i],
+                        this->_depthImageMemories[i]);
+
+            this->_depthImageViews[i] = createImageView(
+                this->_depthImages[i], depthFormat, vk::ImageAspectFlagBits::eDepth);
+
+            transitionImageLayout(this->_depthImages[i],
+                                  depthFormat,
+                                  vk::ImageLayout::eUndefined,
+                                  vk::ImageLayout::eDepthStencilAttachmentOptimal);
+        }
     }
 };
 
