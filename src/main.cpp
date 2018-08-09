@@ -11,9 +11,13 @@
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/hash.hpp>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb/stb_image.h>
+#define TINYOBJLOADER_IMPLEMENTATION
+#include <tinyobjloader/tiny_obj_loader.h>
 
 #include <chrono>
 #include <fstream>
@@ -22,6 +26,7 @@
 #include <list>
 #include <set>
 #include <stdexcept>
+#include <unordered_map>
 
 // TODO:
 // - Unittest :
@@ -108,22 +113,24 @@ struct Vertex_t {
             .setOffset(offsetof(Vertex_t, texCoord));
         return attributeDescriptions;
     }
+
+    bool operator==(Vertex_t const& rhs) const
+    {
+        return position == rhs.position && color == rhs.color && texCoord == rhs.texCoord;
+    }
 };
-
-// interleaving vertex attributes
-const std::vector<Vertex_t> vertices
-    = { { { -0.5f, -0.5f, 0.0f }, { 1.0f, 0.0f, 0.0f }, { 1.0f, 0.0f } },
-        { { 0.5f, -0.5f, 0.0f }, { 0.0f, 1.0f, 0.0f }, { 0.0f, 0.0f } },
-        { { 0.5f, 0.5f, 0.0f }, { 0.0f, 0.0f, 1.0f }, { 0.0f, 1.0f } },
-        { { -0.5f, 0.5f, 0.0f }, { 1.0f, 1.0f, 1.0f }, { 1.0f, 1.0f } },
-
-        { { -0.5f, -0.5f, -0.5f }, { 1.0f, 0.0f, 0.0f }, { 1.0f, 0.0f } },
-        { { 0.5f, -0.5f, -0.5f }, { 0.0f, 1.0f, 0.0f }, { 0.0f, 0.0f } },
-        { { 0.5f, 0.5f, -0.5f }, { 0.0f, 0.0f, 1.0f }, { 0.0f, 1.0f } },
-        { { -0.5f, 0.5f, -0.5f }, { 1.0f, 1.0f, 1.0f }, { 1.0f, 1.0f } } };
-
-const std::vector<uint32_t> indices = { /* 1 */ 0, 1, 2, 2, 3, 0,
-                                        /* 2 */ 4, 5, 6, 6, 7, 4 };
+namespace std {
+    template <>
+    struct hash<Vertex_t> {
+        size_t operator()(Vertex_t const& vertex) const
+        {
+            return ((hash<glm::vec3>()(vertex.position)
+                     ^ (hash<glm::vec3>()(vertex.color) << 1))
+                    >> 1)
+                   ^ (hash<glm::vec2>()(vertex.texCoord) << 1);
+        }
+    };
+}  // namespace std
 
 class PulsarApp {
 private:
@@ -186,6 +193,9 @@ private:
 #ifdef ADD_VALIDATION_LAYERS
     const std::vector<const char*> requiredValidationLayers = VALIDATION_LAYERS;
 #endif
+
+    std::vector<Vertex_t> _vertices;
+    std::vector<uint32_t> _indices;
 
 public:
     int run()
@@ -383,6 +393,7 @@ private:
         createTextureImage();
         createTextureImageView();
         createTextureSampler();
+        loadModel();
         createVertexBuffer();
         createIndexBuffer();
         createUniformBuffers();
@@ -1513,10 +1524,65 @@ private:
         endSingleTimeCommand(commandBuffer, this->_commandPool, this->_graphicsQueue);
     }
 
+    void loadModel()
+    {
+        tinyobj::attrib_t attributes;
+        std::vector<tinyobj::shape_t> shapes;
+        std::vector<tinyobj::material_t> materials;
+        std::string err;
+
+        std::cout << "Loading model vertices..." << std::endl;
+
+        if (!tinyobj::LoadObj(
+                &attributes, &shapes, &materials, &err, "res/models/chalet.obj")) {
+            throw std::runtime_error(err);
+        }
+
+        std::unordered_map<Vertex_t, uint32_t> uniqueVertices = {};
+        size_t dup                                            = 0;
+
+        std::cout << "Loaded " << shapes.size() << " shapes with "
+                  << attributes.vertices.size() / 3 << " vertices, "
+                  << attributes.normals.size() / 3 << " normals and "
+                  << attributes.texcoords.size() / 2 << " texcoord." << std::endl;
+
+        for (auto const& shape : shapes) {
+            for (auto const& index : shape.mesh.indices) {
+                Vertex_t vertex;
+
+                vertex.position = { attributes.vertices[3 * index.vertex_index + 0],
+                                    attributes.vertices[3 * index.vertex_index + 1],
+                                    attributes.vertices[3 * index.vertex_index + 2] };
+                // nx = attrib.normals[3*idx.normal_index+0];
+                vertex.texCoord
+                    = { attributes.texcoords[2 * index.texcoord_index + 0],
+                        1.0f - attributes.texcoords[2 * index.texcoord_index + 1] };
+                vertex.color = { 1.0f, 1.0f, 1.0f };
+
+                auto uniqueVertex = uniqueVertices.find(vertex);
+
+                if (uniqueVertex == uniqueVertices.end()) {
+                    uint32_t vertexIndex = this->_vertices.size();
+
+                    uniqueVertices.emplace(vertex, vertexIndex);
+                    this->_vertices.push_back(vertex);
+                    this->_indices.push_back(vertexIndex);
+                }
+                else {
+                    this->_indices.push_back(uniqueVertex->second);
+                    dup++;
+                }
+            }
+        }
+        std::cout << "Reduced from " << dup + this->_vertices.size() << " to "
+                  << this->_vertices.size() << " unique vertices/texcoord pair."
+                  << std::endl;
+    }
+
     void createTextureImage()
     {
         int texWidth, texHeight, texChannels;
-        stbi_uc* imageData = stbi_load("res/textures/default.png",
+        stbi_uc* imageData = stbi_load("res/textures/chalet.jpg",
                                        &texWidth,
                                        &texHeight,
                                        &texChannels,
@@ -1678,7 +1744,7 @@ private:
 
     void createVertexBuffer()
     {
-        vk::DeviceSize bufferSize = sizeof(Vertex_t) * vertices.size();
+        vk::DeviceSize bufferSize = sizeof(Vertex_t) * this->_vertices.size();
         vk::Buffer stagingBuffer;
         vk::DeviceMemory stagingBufferMemory;
 
@@ -1695,7 +1761,7 @@ private:
         data = this->_device.mapMemory(
             stagingBufferMemory, 0, bufferSize, vk::MemoryMapFlags());
         {
-            std::memcpy(data, vertices.data(), bufferSize);
+            std::memcpy(data, this->_vertices.data(), bufferSize);
         }
         this->_device.unmapMemory(stagingBufferMemory);
 
@@ -1714,7 +1780,7 @@ private:
 
     void createIndexBuffer()
     {
-        vk::DeviceSize bufferSize = sizeof(uint32_t) * indices.size();
+        vk::DeviceSize bufferSize = sizeof(uint32_t) * this->_indices.size();
         vk::Buffer stagingBuffer;
         vk::DeviceMemory stagingBufferMemory;
 
@@ -1730,7 +1796,7 @@ private:
         data = this->_device.mapMemory(
             stagingBufferMemory, 0, bufferSize, vk::MemoryMapFlags());
         {
-            std::memcpy(data, indices.data(), bufferSize);
+            std::memcpy(data, this->_indices.data(), bufferSize);
         }
         this->_device.unmapMemory(stagingBufferMemory);
 
@@ -1919,7 +1985,7 @@ private:
                                                      { this->_descriptorSets[i] },
                                                      {});
 
-                    commandBuffer.drawIndexed(indices.size(), 1, 0, 0, 0);
+                    commandBuffer.drawIndexed(this->_indices.size(), 1, 0, 0, 0);
                 }
                 commandBuffer.endRenderPass();
             }
