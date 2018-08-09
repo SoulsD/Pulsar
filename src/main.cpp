@@ -24,6 +24,8 @@
 #include <stdexcept>
 
 // TODO:
+// - Unittest :
+//     - QueueFamilly selection
 // - Validation Layers / vk_layer_settings.txt
 // - Create own DispatchLoader ? (vkGetInstanceProcAddr)
 // - recreate a new swap chain while drawing commands on an image from the old swap chain
@@ -38,9 +40,15 @@
 
 #ifndef NDEBUG
 #define ADD_VALIDATION_LAYERS
-#define VALIDATION_LAYERS                     \
-    {                                         \
-        "VK_LAYER_LUNARG_standard_validation" \
+#define VALIDATION_LAYERS                                                     \
+    {                                                                         \
+        "VK_LAYER_LUNARG_standard_validation",                                \
+            "VK_LAYER_GOOGLE_threading",            /* standard_validation */ \
+            "VK_LAYER_LUNARG_parameter_validation", /* standard_validation */ \
+            "VK_LAYER_LUNARG_object_tracker",       /* standard_validation */ \
+            "VK_LAYER_LUNARG_core_validation",      /* standard_validation */ \
+            /* "VK_LAYER_LUNARG_swapchain", */      /* standard_validation */ \
+            "VK_LAYER_GOOGLE_unique_objects"        /* standard_validation */ \
     }
 
 #define VALIDATION_LAYERS_REQUIRED_EXTENTIONS \

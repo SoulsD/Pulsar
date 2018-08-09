@@ -20,8 +20,14 @@ TODO
 https://www.msys2.org/
 
 ```sh
-pacman -S mingw64/mingw-w64-x86_64-{gcc,make,vulkan,glslang,glm,glfw}
-# optional : mingw64/mingw-w64-x86_64-{spirv-tools,vulkan-man-pages}
+pacman -S mingw64/mingw-w64-x86_64-{gcc,vulkan,glm,glfw,glslang,gtest} make
+# optional : mingw64/mingw-w64-x86_64-{vulkan-docs,spirv-tools}
+# optional : mingw64/mingw-w64-x86_64-{vulkan-man-pages}
+
+# pacman -S mingw64/mingw-w64-x86_64-{cmake,spirv-tools} base-devel #contains man,gdb?,make
+# C:/msys64/usr/bin/cp.exe => copy.exe
+# vk_loader_platform.h -> #define _WIN32_WINNT 0x0600
+# cmake .. -G"Unix Makefiles" -DGLSLANG_INSTALL_DIR=/mingw64/bin/ -DVULKAN_HEADERS_INSTALL_DIR=/home/apele/projects/Vulkan-Headers/build/install/ #"MSYS Makefiles"
 ```
 
 Add the Vulkan layers path to your environment (mandatory for debug build) :
