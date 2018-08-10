@@ -34,3 +34,8 @@
 # Compilation output
 build/
 *.spv
+
+# Resources
+res/models/
+res/textures/
+res/audio/
