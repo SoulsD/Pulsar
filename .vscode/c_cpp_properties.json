@@ -53,7 +53,9 @@
             "includePath": [
                 "/usr/include",
                 "/usr/local/include",
-                "${workspaceFolder}"
+                "${workspaceFolder}",
+                "${workspaceFolder}/submodules",
+                "${workspaceFolder}/include"
             ],
             "defines": [],
             "intelliSenseMode": "clang-x64",
