@@ -104,11 +104,6 @@ Install package `mingw64/mingw-w64-x86_64-gdb` then modify the default configura
 }
 ```
 
-Don't forget to build in debug mode before lauching : 
-```sh
-make dbg
-```
-
 You can define multiple configurations to launch the unit tests and the main program :
 ```json
 "windows": {
