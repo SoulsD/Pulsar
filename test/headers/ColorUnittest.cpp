@@ -8,23 +8,27 @@ namespace {
         // You can remove any or all of the following functions if its body
         // is empty.
 
-        ColorTest() {
+        ColorTest()
+        {
             // You can do set-up work for each test here.
         }
 
-        virtual ~ColorTest() {
+        virtual ~ColorTest()
+        {
             // You can do clean-up work that doesn't throw exceptions here.
         }
 
         // If the constructor and destructor are not enough for setting up
         // and cleaning up each test, you can define the following methods:
 
-        virtual void SetUp() {
+        virtual void SetUp()
+        {
             // Code here will be called immediately after the constructor (right
             // before each test).
         }
 
-        virtual void TearDown() {
+        virtual void TearDown()
+        {
             // Code here will be called immediately after each test (right
             // before the destructor).
         }
@@ -36,7 +40,8 @@ namespace {
 }  // namespace
 
 // Tests Color constructors.
-TEST_F(ColorTest, DoesConstruct) {
+TEST_F(ColorTest, DoesConstruct)
+{
     {
         Color c;
 
@@ -78,6 +83,19 @@ TEST_F(ColorTest, DoesConstruct) {
         EXPECT_EQ(0x42, c.b);
         EXPECT_EQ(0xFF, c.a);
         c + (Color) 0x8B6C42;
+    }
+
+    {
+        auto a = glm::u8vec4(0x8B, 0x6C, 0x42, 0);
+        Color c;
+        c = a;
+
+        // ASSERT_EQ((uint32_t) c, 0xFF8B6C42);
+
+        EXPECT_EQ(0x8B, c.r);
+        EXPECT_EQ(0x6C, c.g);
+        EXPECT_EQ(0x42, c.b);
+        EXPECT_EQ(0xFF, c.a);
     }
 
     {
@@ -146,9 +164,10 @@ TEST_F(ColorTest, DoesConstruct) {
 }
 
 // Tests Color comparaison operators.
-TEST_F(ColorTest, DoesCompare) {
+TEST_F(ColorTest, DoesCompare)
+{
     Color const c1 = rgba(240, 240, 240, .90);
-    Color       c2 = rgb(2, 128, 240);
+    Color c2       = rgb(2, 128, 240);
 
 #ifdef COLOR_INCLUDE_ALPHA_IN_COMPARISON
     EXPECT_TRUE(c1 == rgba(0xf0, 0xf0, 0xf0, .90));
@@ -166,7 +185,8 @@ TEST_F(ColorTest, DoesCompare) {
 }
 
 // Tests Color assignment.
-TEST_F(ColorTest, DoesAssign) {
+TEST_F(ColorTest, DoesAssign)
+{
     Color c;
 
     c = 0x8B6C42;
@@ -200,7 +220,8 @@ TEST_F(ColorTest, DoesAssign) {
 }
 
 // Tests Color blending.
-TEST_F(ColorTest, DoesBlend) {
+TEST_F(ColorTest, DoesBlend)
+{
     Color c;
 
     c = 0x8B6C42;
@@ -215,7 +236,8 @@ TEST_F(ColorTest, DoesBlend) {
 }
 
 // Tests Color Utils.
-TEST_F(ColorTest, Utils) {
+TEST_F(ColorTest, Utils)
+{
     Color c;
 
     c = 0x8B6C42;

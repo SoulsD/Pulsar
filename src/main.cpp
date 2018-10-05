@@ -41,6 +41,8 @@
 //      http://disq.us/p/1iozw03
 // - Custom Allocator
 // - Multiple descriptor sets (per objects)
+// - vk::UniqueHandle
+// https://www.reddit.com/r/vulkan/comments/9fy42i/new_to_vulkan_using_vulkanhpp_wondering_if_i/
 
 #define REQUIRED_EXTENTIONS \
     {}
@@ -571,7 +573,7 @@ private:
     template <typename T>
     bool checkSupport(std::vector<const char*> const& required,
                       std::vector<T> const& available,
-                      std::string (*accessName)(T),
+                      std::string (*accessName)(T const&),
                       bool print            = true,
                       const char* alignment = "\t")
     {
@@ -604,12 +606,14 @@ private:
     {
         const std::vector<vk::ExtensionProperties> availableExtensions
             = vk::enumerateInstanceExtensionProperties();
-        std::string (*getExtensionName)(vk::ExtensionProperties)
-            = [](vk::ExtensionProperties p) -> std::string { return p.extensionName; };
+        std::string (*extensionNameGetter)(vk::ExtensionProperties const&)
+            = [](vk::ExtensionProperties const& p) -> std::string {
+            return p.extensionName;
+        };
 
         std::cout << "Extensions :" << std::endl;
 
-        return checkSupport(requiredExtensions, availableExtensions, getExtensionName);
+        return checkSupport(requiredExtensions, availableExtensions, extensionNameGetter);
     }
 
 #ifdef ADD_VALIDATION_LAYERS
@@ -620,12 +624,12 @@ private:
     {
         const std::vector<vk::LayerProperties> availableLayers
             = vk::enumerateInstanceLayerProperties();
-        std::string (*getLayerName)(vk::LayerProperties)
-            = [](vk::LayerProperties p) -> std::string { return p.layerName; };
+        std::string (*layerNameGetter)(vk::LayerProperties const&)
+            = [](vk::LayerProperties const& p) -> std::string { return p.layerName; };
 
         std::cout << "Layers :" << std::endl;
 
-        return checkSupport(requiredLayers, availableLayers, getLayerName);
+        return checkSupport(requiredLayers, availableLayers, layerNameGetter);
     }
 
     // Debug callback for validation layer messages
@@ -732,8 +736,10 @@ private:
     {
         const std::vector<vk::ExtensionProperties> availableExtensions
             = device.enumerateDeviceExtensionProperties();
-        std::string (*getExtensionName)(vk::ExtensionProperties)
-            = [](vk::ExtensionProperties p) -> std::string { return p.extensionName; };
+        std::string (*getExtensionName)(vk::ExtensionProperties const&)
+            = [](vk::ExtensionProperties const& p) -> std::string {
+            return p.extensionName;
+        };
 
         return checkSupport(
             requiredExtentions, availableExtensions, getExtensionName, print, "\t\t");

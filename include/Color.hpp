@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <sstream>
 
+#include <glm/glm.hpp>
 #include "Constants.hh"
 
 /*  TODO:
@@ -66,26 +67,30 @@ private:
 
     union uColor final {
     public:
-        uint8_t  component[4];
+        uint8_t component[4];
         uint32_t hex;
+        glm::u8vec4 _glm;
 
     public:
         uColor() { this->hex = 0; }
 
         uColor(uColor const& c) { *this = c; }
 
-        uColor& operator=(uColor const& c) {
+        uColor& operator=(uColor const& c)
+        {
             this->hex = c.hex;
             return *this;
         }
 
         uColor& operator=(uColor&&) = default;
 
-        uColor(uint32_t c) {  // /!\ 0xAARRGGBB
+        uColor(uint32_t c)
+        {  // /!\ 0xAARRGGBB
             this->hex = c;
         }
 
-        uColor(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
+        uColor(uint8_t r, uint8_t g, uint8_t b, uint8_t a)
+        {
             this->component[RED]   = r;
             this->component[GREEN] = g;
             this->component[BLUE]  = b;
@@ -109,79 +114,93 @@ private:
 #else
         operator uint8_t() const { return *(this->_component); }
 
-        ColorComponent& operator=(uint32_t value) {
+        ColorComponent& operator=(uint32_t value)
+        {
             *(this->_component) = std::min(value, 0xFFu);
             return *this;
         }
 
-        ColorComponent& operator+=(uint8_t value) {
+        ColorComponent& operator+=(uint8_t value)
+        {
             uint32_t res = *(this->_component) + value;
 
             *(this->_component) = std::min(res, 0xFFu);
             return *this;
         }
 
-        ColorComponent& operator-=(uint8_t value) {
+        ColorComponent& operator-=(uint8_t value)
+        {
             uint8_t res = *(this->_component) - value;
 
             *(this->_component) = value >= *(this->_component) ? 0x0 : res;
             return *this;
         }
 
-        ColorComponent& operator*=(double value) {
+        ColorComponent& operator*=(double value)
+        {
             if (value > 0) {
                 uint32_t res = std::round(*(this->_component) * value);
 
                 *(this->_component) = std::min(res, 0xFFu);
-            } else {
+            }
+            else {
                 *(this->_component) = 0;
             }
             return *this;
         }
 
-        ColorComponent& operator/=(double value) {
+        ColorComponent& operator/=(double value)
+        {
             uint32_t res;
 
             if (value >= 1) {
                 res = std::round(*(this->_component) / value);
 
                 *(this->_component) = std::max(res, 0x00u);
-            } else if (value > 0) {
+            }
+            else if (value > 0) {
                 res = std::round(*(this->_component) / value);
 
                 *(this->_component) = std::min(res, 0xFFu);
-            } else {
+            }
+            else {
                 *(this->_component) = 0;
             }
             return *this;
         }
 
-        ColorComponent& operator%=(uint8_t value) {
+        ColorComponent& operator%=(uint8_t value)
+        {
             *(this->_component) %= value;
             return *this;
         }
 
-        ColorComponent& operator&=(uint8_t value) {
+        ColorComponent& operator&=(uint8_t value)
+        {
             *(this->_component) &= value;
             return *this;
         }
 
-        ColorComponent& operator|=(uint8_t value) {
+        ColorComponent& operator|=(uint8_t value)
+        {
             *(this->_component) |= value;
             return *this;
         }
 
-        ColorComponent& operator^=(uint8_t value) {
+        ColorComponent& operator^=(uint8_t value)
+        {
             *(this->_component) ^= value;
             return *this;
         }
 
-        ColorComponent& operator<<=(uint8_t value) {
+        ColorComponent& operator<<=(uint8_t value)
+        {
             *(this->_component) <<= value;
             return *this;
         }
 
-        ColorComponent& operator>>=(uint8_t value) {
+        ColorComponent& operator>>=(uint8_t value)
+        {
             *(this->_component) >>= value;
             return *this;
         }
@@ -209,16 +228,23 @@ public:
 public:
     Color() {}
 
-    Color(Color const& c) : _color(c._color.hex) { *this = c; }
+    Color(Color const& c) { *this = c; }
 
-    Color& operator=(Color const& c) {
+    Color& operator=(Color const& c) = default;
+    // {
+    //     this->_color = c._color;
+    //     return *this;
+    // }
+
+    Color(Color&& c) : _color(c._color) {}  // = default;
+    Color& operator=(Color&& c)
+    {
         this->_color = c._color;
         return *this;
-    }
+    }  // = default;
 
-    Color& operator=(Color&&) = default;
-
-    Color(uint32_t c) : _color(c) {
+    Color(uint32_t c) : _color(c)
+    {
 #ifdef COLOR_IMPLICIT_ALPHA_ASSIGNMENT
         if (this->a == 0) {
             this->a = 255;
@@ -226,8 +252,11 @@ public:
 #endif /* !COLOR_IMPLICIT_ALPHA_ASSIGNMENT */
     }
 
-    Color(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255)
-        : _color(r, g, b, a) {}
+#ifdef COLOR_IMPLICIT_ALPHA_ASSIGNMENT
+    Color(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255) : _color(r, g, b, a) {}
+#else
+    Color(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 0) : _color(r, g, b, a) {}
+#endif
 
 
     /**
@@ -235,18 +264,18 @@ public:
      */
 
 public:
-    inline static Color rgb(uint8_t r, uint8_t g, uint8_t b) {
-        return Color(r, g, b);
-    }
+    inline static Color rgb(uint8_t r, uint8_t g, uint8_t b) { return Color(r, g, b); }
 
-    inline static Color rgba(uint8_t r, uint8_t g, uint8_t b, double a = .0) {
-        uint8_t alpha = std::min(
-            std::max(static_cast<int>(std::round(0xFF * a)), 0x00), 0xFF);
+    inline static Color rgba(uint8_t r, uint8_t g, uint8_t b, double a = .0)
+    {
+        uint8_t alpha
+            = std::min(std::max(static_cast<int>(std::round(0xFF * a)), 0x00), 0xFF);
         return Color(r, g, b, alpha);
     }
 
     // 0xRRGGBB
-    inline static Color rgb(uint32_t c) {
+    inline static Color rgb(uint32_t c)
+    {
         // force Alpha to FF
         c = (c & ~0xFF000000) | 0xFF000000;
         return Color(c);
@@ -256,14 +285,16 @@ public:
     inline static Color argb(uint32_t c) { return Color(c); }
 
     // 0xRRGGBBAA
-    static Color rgba(uint32_t c) {
+    static Color rgba(uint32_t c)
+    {
         // (0xRRGGBBAA -> 0xAARRGGBB)
         c = (c & 0xFFFFFF00) >> 8 | (c & 0x000000FF) << 24;
         return Color(c);
     }
 
     // 0xAABBGGRR
-    static Color abgr(uint32_t c) {
+    static Color abgr(uint32_t c)
+    {
         // swap RR and BB (0xAABBGGRR -> 0xAARRGGBB)
         c = c ^ ((c >> 16) & 0x000000FF);
         c = c ^ ((c << 16) & 0x00FF0000);
@@ -272,7 +303,8 @@ public:
     }
 
     // 0xBBGGRRAA
-    static Color bgra(uint32_t c) {
+    static Color bgra(uint32_t c)
+    {
         // reverse byte order (0xBBGGRRAA -> 0xAARRGGBB)
         c = (c & 0x0000FFFF) << 16 | (c & 0xFFFF0000) >> 16;
         c = (c & 0x00FF00FF) << 8 | (c & 0xFF00FF00) >> 8;
@@ -286,13 +318,40 @@ public:
 
     operator uint32_t() const { return this->_color.hex; }
 
-    Color& operator=(uint32_t const& c) {
+    Color& operator=(uint32_t c)
+    {
         this->_color = c;
 #ifdef COLOR_IMPLICIT_ALPHA_ASSIGNMENT
         if (this->a == 0) {
             this->a = 255;
         }
 #endif /* !COLOR_IMPLICIT_ALPHA_ASSIGNMENT */
+        return *this;
+    }
+
+    // operator glm::u8vec4() const { return this->_color._glm; }
+
+    template <typename T, glm::precision Q>
+    Color& operator=(glm::vec<4, T, Q> const& c)
+    {
+        *this = Color(static_cast<uint8_t>(c.r),
+                      static_cast<uint8_t>(c.g),
+                      static_cast<uint8_t>(c.b),
+                      static_cast<uint8_t>(c.a));
+#ifdef COLOR_IMPLICIT_ALPHA_ASSIGNMENT
+        if (this->a == 0) {
+            this->a = 255;
+        }
+#endif /* !COLOR_IMPLICIT_ALPHA_ASSIGNMENT */
+        return *this;
+    }
+
+    template <typename T, glm::precision Q>
+    Color& operator=(glm::vec<3, T, Q> const& c)
+    {
+        *this = Color(static_cast<uint8_t>(c.r),
+                      static_cast<uint8_t>(c.g),
+                      static_cast<uint8_t>(c.b));
         return *this;
     }
 
@@ -306,7 +365,8 @@ public:
      *      https://en.wikipedia.org/wiki/Color_difference
      */
 
-    inline bool operator==(Color const& c) const {
+    inline bool operator==(Color const& c) const
+    {
 #ifdef COLOR_INCLUDE_ALPHA_IN_COMPARISON
         return this->_color.hex == c._color.hex;
 #else
@@ -317,9 +377,7 @@ public:
     }
     inline bool operator!=(Color const& c) const { return !(*this == c); }
 
-    inline bool operator<(Color const& c) const {
-        return this->value() < c.value();
-    }
+    inline bool operator<(Color const& c) const { return this->value() < c.value(); }
     inline bool operator>(Color const& c) const { return c < *this; }
     inline bool operator<=(Color const& c) const { return !(*this > c); }
     inline bool operator>=(Color const& c) const { return !(*this < c); }
@@ -328,20 +386,20 @@ public:
      *  Explicitly Deleted Operators
      */
 
-    Color& operator++()         = delete;
-    Color  operator++(int)      = delete;
-    Color& operator--()         = delete;
-    Color  operator--(int)      = delete;
-    Color  operator+(int) const = delete;
-    Color  operator-(int) const = delete;
-    Color  operator*(int) const = delete;
-    Color  operator/(int) const = delete;
-    Color  operator%(int) const = delete;
-    Color  operator+=(int)      = delete;
-    Color  operator-=(int)      = delete;
-    Color  operator*=(int)      = delete;
-    Color  operator/=(int)      = delete;
-    Color  operator%=(int)      = delete;
+    Color& operator++()        = delete;
+    Color operator++(int)      = delete;
+    Color& operator--()        = delete;
+    Color operator--(int)      = delete;
+    Color operator+(int) const = delete;
+    Color operator-(int) const = delete;
+    Color operator*(int) const = delete;
+    Color operator/(int) const = delete;
+    Color operator%(int) const = delete;
+    Color operator+=(int)      = delete;
+    Color operator-=(int)      = delete;
+    Color operator*=(int)      = delete;
+    Color operator/=(int)      = delete;
+    Color operator%=(int)      = delete;
 
     /**
      *  Color Blend
@@ -353,8 +411,9 @@ public:
 
     class Blend final {
     private:
-        inline static uint32_t overflowCheck(uint32_t v) {
-        // v1, v2 cast from uint8_t to uint32_t
+        inline static uint32_t overflowCheck(uint32_t v)
+        {
+            // v1, v2 cast from uint8_t to uint32_t
 #ifdef COLOR_COMPONENT_OVERFLOW_CHECK
             return std::min(v, 0xFFu);
 #else
@@ -363,14 +422,16 @@ public:
         }
 
     public:
-        static Color none(Color const& c1, Color const& c2) {
+        static Color none(Color const& c1, Color const& c2)
+        {
             return Color(overflowCheck(c1.r + c2.r),
                          overflowCheck(c1.g + c2.g),
                          overflowCheck(c1.b + c2.b),
                          overflowCheck(c1.a + c2.a));
         }
 
-        static Color alpha(Color const& c1, Color const& c2) {
+        static Color alpha(Color const& c1, Color const& c2)
+        {
             float srcA = c2.alpha();
 
             return Color(overflowCheck(c1.r * (1 - srcA) + c2.r * srcA),
@@ -379,7 +440,8 @@ public:
                          overflowCheck(c1.a + c2.a * srcA));
         }
 
-        static Color additive(Color const& c1, Color const& c2) {
+        static Color additive(Color const& c1, Color const& c2)
+        {
             float srcA = c2.alpha();
 
             return Color(overflowCheck(c1.r + c2.r * srcA),
@@ -388,7 +450,8 @@ public:
                          c2.a);
         }
 
-        static Color modulate(Color const& c1, Color const& c2) {
+        static Color modulate(Color const& c1, Color const& c2)
+        {
             return Color(overflowCheck(c1.r * c2.r),
                          overflowCheck(c1.g * c2.g),
                          overflowCheck(c1.b * c2.b),
@@ -397,19 +460,16 @@ public:
     }; /* !Blend */
 
 public:
-    inline static void setBlendMode(BlendMode_t mode) {
-        Color::_blendMode = mode;
-    }
+    inline static void setBlendMode(BlendMode_t mode) { Color::_blendMode = mode; }
 
     inline static BlendMode_t getBlendMode() { return Color::_blendMode; }
 
-    Color& operator+=(Color const& c) {
-        return (*this = Color::_blendMode(*this, c));
-    }
+    Color& operator+=(Color const& c) { return (*this = Color::_blendMode(*this, c)); }
 
     // friends defined inside class body are inline and are hidden from non-ADL
     // lookup
-    friend Color operator+(Color lhs, Color const& rhs) {
+    friend Color operator+(Color lhs, Color const& rhs)
+    {
         lhs += rhs;  // reuse compound assignment
         return lhs;  // return the result by value (uses move constructor)
     }
@@ -425,18 +485,21 @@ private:
 public:
     inline double alpha() const { return this->a / 255.; }
 
-    inline double dist(Color const& c) const {
+    inline double dist(Color const& c) const
+    {
         return std::sqrt(static_cast<double>(std::pow(c.r - this->r, 2)
                                              + std::pow(c.g - this->g, 2)
                                              + std::pow(c.b - this->b, 2)));
     }
 
     // ITU-R (International Telecommunication Union recomm.) formula
-    inline double value() const {
+    inline double value() const
+    {
         return .299 * this->r + .587 * this->g + .114 * this->b;
     }
 
-    std::string toString() const {
+    std::string toString() const
+    {
         std::ostringstream oss;
 
         oss << "rgba(r: " << (int) this->r << " g: " << (int) this->g
@@ -445,6 +508,11 @@ public:
     }
 }; /* !Color */
 
+std::ostream& operator<<(std::ostream& os, Color const& color)
+{
+    os << color.toString();
+    return os;
+}
 
 /**
  *  Disable implicit comparison with integers
@@ -469,11 +537,13 @@ inline bool operator>=(uint32_t const&, Color const&) = delete;
  */
 
 #ifndef COLOR_NO_C_STYLE_CONSTRUCTION
-inline static Color rgba(uint8_t r, uint8_t g, uint8_t b, double a = .0) {
+inline static Color rgba(uint8_t r, uint8_t g, uint8_t b, double a = .0)
+{
     return Color::rgba(r, g, b, a);
 }
 
-inline static Color rgb(uint8_t r, uint8_t g, uint8_t b) {
+inline static Color rgb(uint8_t r, uint8_t g, uint8_t b)
+{
     return Color::rgb(r, g, b);
 }
 #endif /* !COLOR_NO_C_STYLE_CONSTRUCTION */

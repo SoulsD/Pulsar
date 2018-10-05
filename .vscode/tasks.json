@@ -2,55 +2,62 @@
     // See https://go.microsoft.com/fwlink/?LinkId=733558
     // for the documentation about the tasks.json format
     "version": "2.0.0",
+    "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared",
+        "showReuseMessage": true
+    },
     "tasks": [
         {
-            "label": "build all",
+            "label": "(build) All",
             "type": "shell",
             "command": "make",
             "group": "build",
             "problemMatcher": "$gcc"
         },
         {
-            "label": "build debug",
+            "label": "(build) Debug",
             "type": "shell",
             "command": "make pulsar",
-            "group": {
-                "kind": "build",
-                "isDefault": true
-            },
+            "group": "build",
             "problemMatcher": "$gcc"
         },
         {
-            "label": "build tests",
+            "label": "(build) Tests",
             "type": "shell",
             "command": "make test",
             "group": "build",
             "problemMatcher": "$gcc"
         },
         {
-            "label": "build shaders",
+            "label": "(build) Shaders",
             "type": "shell",
             "command": "make shaders",
             "group": "build",
             "problemMatcher": "$gcc"
         },
         {
-            "label": "build release",
+            "label": "(build) Release",
             "type": "shell",
             "command": "make release",
             "group": "build",
             "problemMatcher": "$gcc"
         },
         {
-            "label": "build clean",
+            "label": "(build) Clean",
             "type": "shell",
             "command": "make clean",
             "group": "build",
         },
         {
-            "label": "run tests",
+            "label": "(run) Tests",
             "type": "shell",
             "command": "test/run_unittest",
+            "args": [
+                "--gtest_color=no"
+            ],
             "group": {
                 "kind": "test",
                 "isDefault": true
