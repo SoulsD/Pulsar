@@ -90,12 +90,25 @@ TEST_F(ColorTest, DoesConstruct)
         Color c;
         c = a;
 
-        // ASSERT_EQ((uint32_t) c, 0xFF8B6C42);
+        ASSERT_EQ((uint32_t) c, 0xFF8B6C42);
 
         EXPECT_EQ(0x8B, c.r);
         EXPECT_EQ(0x6C, c.g);
         EXPECT_EQ(0x42, c.b);
         EXPECT_EQ(0xFF, c.a);
+
+        auto b = glm::vec3(0x8B, 0x6C, 0x42);
+        c      = b;
+
+#ifdef COLOR_IMPLICIT_ALPHA_ASSIGNMENT
+        EXPECT_EQ((uint32_t) c, 0xFF8B6C42);
+#else
+        EXPECT_EQ((uint32_t) c, 0x8B6C42);
+#endif
+
+        EXPECT_EQ(0x8B, c.r);
+        EXPECT_EQ(0x6C, c.g);
+        EXPECT_EQ(0x42, c.b);
     }
 
     {

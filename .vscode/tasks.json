@@ -77,7 +77,7 @@
                         "line": 2
                     },
                     {
-                        "regexp": "^((:?Value of:.*)|(:?  Actual: .*)|(:?Expected: .*)|(:?      Expected: .*)|(:?To be equal to: .*)|(:?      Which is: .*))$",
+                        "regexp": "^((:?Value of:.*)|(:?  Actual: .*)|(:?Expected: .*)|(:?      Expected: .*)|(:?To be equal to: .*)|(:?      Which is: .*)|(:?Expected equality of these values:)|(:?  .*)|(:?    Which is: .*))$",
                         "message": 1,
                         "loop": true
                     }
