@@ -59,7 +59,7 @@ shaders: dir
 	@$(ECHO) Compiling shaders ...
 	@for shader in $(SHADERS); do \
 		res_shader=$(SPVDIR)`basename $$shader`.spv ; \
-		$(GLSLANGVAL) -V $$shader -o $$res_shader \
+		$(GLSLANGVAL) -V -t $$shader -o $$res_shader \
 		&& $(ECHO) ' =>' $$res_shader ; \
 	done
 

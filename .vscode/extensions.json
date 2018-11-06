@@ -5,6 +5,7 @@
 	"recommendations": [
 		"ms-vscode.cpptools",
 		"slevesque.shader",
+		"CADENAS.vscode-glsllint",
 		"eamodio.gitlens",
 		"naumovs.color-highlight",
 		"yzhang.markdown-all-in-one"

@@ -22,5 +22,6 @@
         "CHERE_INVOKING": "1",
         "MSYSTEM": "MINGW64"
     },
-    // "glsllint.glslangValidatorPath": "C:/msys64/mingw64/bin/glslangValidator.exe"
+    "glsllint.glslangValidatorPath": "C:/msys64/mingw64/bin/glslangValidator.exe",
+    "glsllint.glslangValidatorArgs": "-V -t -o C:/msys64/tmp/out.spv"
 }
