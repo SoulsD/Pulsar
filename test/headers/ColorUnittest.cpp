@@ -85,20 +85,20 @@ TEST_F(ColorTest, DoesConstruct)
         c + (Color) 0x8B6C42;
     }
 
+    // glm construct
     {
-        auto a = glm::u8vec4(0x8B, 0x6C, 0x42, 0);
-        Color c;
-        c = a;
+        Color c(glm::u8vec4(0x8B, 0x6C, 0x42, 0));
 
-        ASSERT_EQ((uint32_t) c, 0xFF8B6C42);
+        EXPECT_EQ((uint32_t) c, 0x8B6C42);
 
         EXPECT_EQ(0x8B, c.r);
         EXPECT_EQ(0x6C, c.g);
         EXPECT_EQ(0x42, c.b);
-        EXPECT_EQ(0xFF, c.a);
+        EXPECT_EQ(0x00, c.a);
+    }
 
-        auto b = glm::vec3(0x8B, 0x6C, 0x42);
-        c      = b;
+    {
+        Color c = glm::vec3(0x8B, 0x6C, 0x42);
 
 #ifdef COLOR_IMPLICIT_ALPHA_ASSIGNMENT
         EXPECT_EQ((uint32_t) c, 0xFF8B6C42);
@@ -176,27 +176,6 @@ TEST_F(ColorTest, DoesConstruct)
     }
 }
 
-// Tests Color comparaison operators.
-TEST_F(ColorTest, DoesCompare)
-{
-    Color const c1 = rgba(240, 240, 240, .90);
-    Color c2       = rgb(2, 128, 240);
-
-#ifdef COLOR_INCLUDE_ALPHA_IN_COMPARISON
-    EXPECT_TRUE(c1 == rgba(0xf0, 0xf0, 0xf0, .90));
-    EXPECT_FALSE(c1 == rgb(0xf0, 0xf0, 0xf0));
-#else
-    EXPECT_TRUE(c1 == rgba(0xf0, 0xf0, 0xf0, .90));
-    EXPECT_TRUE(c1 == rgb(0xf0, 0xf0, 0xf0));
-#endif /* !COLOR_INCLUDE_ALPHA_IN_COMPARISON */
-    EXPECT_FALSE(c1 == c2);
-    EXPECT_TRUE(c1 != c2);
-    EXPECT_TRUE(c1 > c2);
-
-    EXPECT_TRUE(c1.b == c2.b);
-    EXPECT_TRUE(c1.r != c2.r);
-}
-
 // Tests Color assignment.
 TEST_F(ColorTest, DoesAssign)
 {
@@ -230,6 +209,61 @@ TEST_F(ColorTest, DoesAssign)
     c.r = 0x80;
     EXPECT_EQ((c.r /= -1000), 0x00);
 #endif
+
+    // glm assigment
+    {
+        Color c;
+
+        auto a = glm::u8vec4(0x8B, 0x6C, 0x42, 0);
+        c      = a;
+
+        EXPECT_EQ((uint32_t) c, 0x8B6C42);
+
+        EXPECT_EQ(0x8B, c.r);
+        EXPECT_EQ(0x6C, c.g);
+        EXPECT_EQ(0x42, c.b);
+        EXPECT_EQ(0x00, c.a);
+
+        auto b = glm::vec3(0x8B, 0x6C, 0x42);
+        c      = b;
+
+#ifdef COLOR_IMPLICIT_ALPHA_ASSIGNMENT
+        EXPECT_EQ((uint32_t) c, 0xFF8B6C42);
+#else
+        EXPECT_EQ((uint32_t) c, 0x8B6C42);
+#endif
+
+        EXPECT_EQ(0x8B, c.r);
+        EXPECT_EQ(0x6C, c.g);
+        EXPECT_EQ(0x42, c.b);
+    }
+}
+
+// Tests Color comparaison operators.
+TEST_F(ColorTest, DoesCompare)
+{
+    Color const c1 = rgba(240, 240, 240, .90);
+    Color c2       = rgb(2, 128, 240);
+
+#ifdef COLOR_INCLUDE_ALPHA_IN_COMPARISON
+    EXPECT_TRUE(c1 == rgba(0xf0, 0xf0, 0xf0, .90));
+    EXPECT_FALSE(c1 == rgb(0xf0, 0xf0, 0xf0));
+#else
+    EXPECT_TRUE(c1 == rgba(0xf0, 0xf0, 0xf0, .90));
+    EXPECT_TRUE(c1 == rgb(0xf0, 0xf0, 0xf0));
+#endif /* !COLOR_INCLUDE_ALPHA_IN_COMPARISON */
+    EXPECT_FALSE(c1 == c2);
+    EXPECT_TRUE(c1 != c2);
+    EXPECT_TRUE(c1 > c2);
+
+    EXPECT_TRUE(c1.b == c2.b);
+    EXPECT_TRUE(c1.r != c2.r);
+
+    auto a = glm::u8vec4(0x8B, 0x6C, 0x42, 0);
+    c2     = a;
+
+    EXPECT_EQ(c2, a);
+    EXPECT_EQ(static_cast<glm::u8vec4>(c2), a);
 }
 
 // Tests Color blending.

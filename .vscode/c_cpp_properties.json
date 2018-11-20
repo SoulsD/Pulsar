@@ -2,26 +2,15 @@
     "configurations": [
         {
             "name": "Msys64",
-            "compilerPath": "C:/msys64/mingw64/bin/gcc",
+            "compilerPath": "C:/msys64/mingw64/bin/g++ -Wall -Wextra",
             "includePath": [
                 "${workspaceFolder}/include",
                 "${workspaceFolder}/submodules"
             ],
             "defines": [
-                "_DEBUG",
-                "UNICODE",
-                "_UNICODE",
-                "__GNUC__=7",
-                "__cdecl=__attribute__((__cdecl__))"
+                "_DEBUG"
             ],
-            "intelliSenseMode": "clang-x64",
-            "browse": {
-                "path": [
-                    "${workspaceFolder}"
-                ],
-                "limitSymbolsToIncludedHeaders": true,
-                "databaseFilename": ""
-            },
+            "intelliSenseMode": "gcc-x64",
             "cStandard": "c11",
             "cppStandard": "c++17"
         },
@@ -34,15 +23,6 @@
             ],
             "defines": [],
             "intelliSenseMode": "clang-x64",
-            "browse": {
-                "path": [
-                    "/usr/include",
-                    "/usr/local/include",
-                    "${workspaceFolder}"
-                ],
-                "limitSymbolsToIncludedHeaders": true,
-                "databaseFilename": ""
-            },
             "macFrameworkPath": [
                 "/System/Library/Frameworks",
                 "/Library/Frameworks"
@@ -58,16 +38,7 @@
                 "${workspaceFolder}/include"
             ],
             "defines": [],
-            "intelliSenseMode": "clang-x64",
-            "browse": {
-                "path": [
-                    "/usr/include",
-                    "/usr/local/include",
-                    "${workspaceFolder}"
-                ],
-                "limitSymbolsToIncludedHeaders": true,
-                "databaseFilename": ""
-            }
+            "intelliSenseMode": "gcc-x64"
         }
     ],
     "version": 4
