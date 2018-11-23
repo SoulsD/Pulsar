@@ -20,20 +20,13 @@ TODO
 https://www.msys2.org/
 
 ```sh
-pacman -S mingw64/mingw-w64-x86_64-{gcc,gdb,vulkan,glm,glfw,glslang,gtest} make
-# optional : mingw64/mingw-w64-x86_64-{vulkan-docs,spirv-tools}
-# optional : mingw64/mingw-w64-x86_64-{vulkan-man-pages}
-
-# pacman -S mingw64/mingw-w64-x86_64-{cmake,spirv-tools} base-devel #contains man,gdb,make #mingw-w64-x86_64-toolchain
-# C:/msys64/usr/bin/cp.exe => copy.exe
-# vk_loader_platform.h -> #define _WIN32_WINNT 0x0600
-# cmake .. -G"Unix Makefiles" -DGLSLANG_INSTALL_DIR=/mingw64/bin/ -DVULKAN_HEADERS_INSTALL_DIR=/home/apele/projects/Vulkan-Headers/build/install/ #"MSYS Makefiles"
+pacman -S mingw64/mingw-w64-x86_64-{gcc,gdb,vulkan-devel,glm,glfw,glslang,gtest} base-devel
 ```
 
-Add the Vulkan layers path to your environment (mandatory for debug build) :
+<!-- Add the Vulkan layers path to your environment (mandatory for debug build) :
 ```sh
 export VK_LAYER_PATH=/mingw64/lib/
-```
+``` -->
 
 # VS Code configuration
 
@@ -52,11 +45,6 @@ Update configuration in file `.vscode/c_cpp_properties.json` with the the follow
 
 ```json
 "compilerPath": "C:/msys64/mingw64/bin/gcc",
-"defines": [
-    // ...
-    "__GNUC__=7",
-    "__cdecl=__attribute__((__cdecl__))"
-]
 ```
 
 Moreover, in file `.vscode/settings.json` you can add :

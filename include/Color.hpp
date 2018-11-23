@@ -5,7 +5,6 @@
 #include <cstdint>
 #include <sstream>
 
-#include <glm/glm.hpp>
 #include "Constants.hh"
 
 /*  TODO:
@@ -257,13 +256,6 @@ public:
     Color(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 0) : _color(r, g, b, a) {}
 #endif
 
-    template <int C, typename T, glm::precision Q>
-    Color(glm::vec<C, T, Q> const& c)
-    {
-        *this = c;
-    }
-
-
     /**
      *  Color Constructors
      */
@@ -281,8 +273,8 @@ public:
     // 0xRRGGBB
     inline static Color rgb(uint32_t c)
     {
-        // force Alpha to FF
-        c = (c & ~0xFF000000) | 0xFF000000;
+        // force Alpha to 00
+        c = (c & ~0xFF000000);
         return Color(c);
     }
 
@@ -290,7 +282,7 @@ public:
     inline static Color argb(uint32_t c) { return Color(c); }
 
     // 0xRRGGBBAA
-    static Color rgba(uint32_t c)
+    inline static Color rgba(uint32_t c)
     {
         // (0xRRGGBBAA -> 0xAARRGGBB)
         c = (c & 0xFFFFFF00) >> 8 | (c & 0x000000FF) << 24;
@@ -298,7 +290,7 @@ public:
     }
 
     // 0xAABBGGRR
-    static Color abgr(uint32_t c)
+    inline static Color abgr(uint32_t c)
     {
         // swap RR and BB (0xAABBGGRR -> 0xAARRGGBB)
         c = c ^ ((c >> 16) & 0x000000FF);
@@ -308,7 +300,7 @@ public:
     }
 
     // 0xBBGGRRAA
-    static Color bgra(uint32_t c)
+    inline static Color bgra(uint32_t c)
     {
         // reverse byte order (0xBBGGRRAA -> 0xAARRGGBB)
         c = (c & 0x0000FFFF) << 16 | (c & 0xFFFF0000) >> 16;
@@ -333,32 +325,6 @@ public:
 #endif /* !COLOR_IMPLICIT_ALPHA_ASSIGNMENT */
         return *this;
     }
-
-    template <int C, typename T, glm::precision Q>
-    explicit operator glm::vec<C, T, Q>() const
-    {
-        return glm::u8vec4(this->r, this->g, this->b, this->a);
-    }
-
-    template <typename T, glm::precision Q>
-    Color& operator=(glm::vec<4, T, Q> const& c)
-    {
-        *this = Color(static_cast<uint8_t>(c.r),
-                      static_cast<uint8_t>(c.g),
-                      static_cast<uint8_t>(c.b),
-                      static_cast<uint8_t>(c.a));
-        return *this;
-    }
-
-    template <typename T, glm::precision Q>
-    Color& operator=(glm::vec<3, T, Q> const& c)
-    {
-        *this = Color(static_cast<uint8_t>(c.r),
-                      static_cast<uint8_t>(c.g),
-                      static_cast<uint8_t>(c.b));
-        return *this;
-    }
-
 
     /**
      *  Relational Operators
