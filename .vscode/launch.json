@@ -11,7 +11,7 @@
             "program": "${workspaceFolder}/build/pulsar",
             "windows": {
                 "program": "${workspaceFolder}/build/pulsar.exe",
-                "miDebuggerPath": "C:/msys64/mingw64/bin/gdb.exe"
+                "miDebuggerPath": "C:/msys64/usr/bin/gdb.exe"
             },
             "args": [],
             "stopAtEntry": false,
@@ -34,7 +34,7 @@
             "program": "${workspaceFolder}/test/run_unittest",
             "windows": {
                 "program": "${workspaceFolder}/test/run_unittest.exe",
-                "miDebuggerPath": "C:/msys64/mingw64/bin/gdb.exe"
+                "miDebuggerPath": "C:/msys64/usr/bin/gdb.exe"
             },
             "args": [],
             "stopAtEntry": false,

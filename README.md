@@ -3,15 +3,15 @@ Pusar Engine - Based on Vulkan
 
 - [Pulsar](#pulsar)
 - [Build](#build)
-    - [Windows / MSYS2 (Mingw64)](#windows--msys2-mingw64)
+  - [Windows / MSYS2 (Mingw64)](#windows--msys2-mingw64)
 - [VS Code configuration](#vs-code-configuration)
-    - [Windows / MSYS2](#windows--msys2)
-        - [Git](#git)
-        - [C/Cpp IntelliSense](#ccpp-intellisense)
-        - [Code formatting - clang-format](#code-formatting---clang-format)
-        - [Integrated Terminal](#integrated-terminal)
-        - [Tasks](#tasks)
-        - [Debugger - gdb](#debugger---gdb)
+  - [Windows / MSYS2](#windows--msys2)
+    - [Git](#git)
+    - [C/Cpp IntelliSense](#ccpp-intellisense)
+    - [Code formatting - clang-format](#code-formatting---clang-format)
+    - [Integrated Terminal](#integrated-terminal)
+    - [Tasks](#tasks)
+    - [Debugger - gdb](#debugger---gdb)
 
 # Build
 TODO
@@ -20,7 +20,7 @@ TODO
 https://www.msys2.org/
 
 ```sh
-pacman -S mingw64/mingw-w64-x86_64-{gcc,gdb,vulkan-devel,glm,glfw,glslang,gtest} base-devel
+pacman -S mingw64/mingw-w64-x86_64-{gcc,vulkan-devel,glm,glfw,glslang,gtest} base-devel
 ```
 
 <!-- Add the Vulkan layers path to your environment (mandatory for debug build) :
@@ -88,7 +88,7 @@ Install package `mingw64/mingw-w64-x86_64-gdb` then modify the default configura
 
 ```json
 "windows": {
-    "miDebuggerPath": "C:/msys64/mingw64/bin/gdb.exe"
+    "miDebuggerPath": "C:/msys64/usr/bin/gdb.exe"
 }
 ```
 

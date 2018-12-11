@@ -78,7 +78,7 @@ re: fclean all
 
 release: CXXFLAGS := $(filter-out $(DBGFLAGS),$(CXXFLAGS))
 release: CXXFLAGS += -DNDEBUG
-release: $(NAME)
+release: fclean $(NAME)
 
 .cpp.o:
 	@$(ECHO) $(CXX) -c $(CXXFLAGS) $<
